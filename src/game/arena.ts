@@ -1,9 +1,11 @@
 import type { CharacterScene } from '@mogshot/character/scene';
 import { CLASSIC_SCREEN_ASPECT, composeBackdrop } from '@mogshot/render/backdrop';
+import type { PosableRig } from '@mogshot/model/posable';
 import { type Camera, CharacterRenderer, type Shadow } from '@mogshot/render/renderer';
 import { mergedPose, mergeScenes } from '../engine/merge';
 import { HALF, STAGE_BOX, worldMatrix } from '../engine/stage';
 import type { BuiltFighter } from './fighters';
+import { type AnchorAt, type FxPose, type FxSlot, HIDDEN, type Point } from './fx';
 import { floorAt, type FloorProfile, floorProfile } from './ground';
 import type { Ground } from './stages';
 
@@ -35,6 +37,11 @@ export class Arena {
   private parts: ReturnType<typeof mergeScenes>['parts'] = [];
   private merged: CharacterScene | undefined;
   private fighters: BuiltFighter[] = [];
+  private effects: readonly FxSlot[] = [];
+  /** Each fighter's body bones in the last pose drawn, for its attachment points. */
+  private bodyBones: (Float32Array | undefined)[] = [];
+  private lastPlacements: Placement[] = [];
+  private restPoses: ReturnType<PosableRig['pose']>[] = [];
   private ground: Ground = {};
   private floor: FloorProfile | undefined;
   private backdropSize = '';
@@ -44,9 +51,12 @@ export class Arena {
     this.renderer.setFocus(FOCUS);
   }
 
-  setFighters(fighters: BuiltFighter[]): void {
+  /** The fighters, and after them the spell models that may be drawn about them (fx.ts), as one scene. */
+  setFighters(fighters: BuiltFighter[], effects: readonly FxSlot[] = []): void {
     this.fighters = fighters;
-    const merged = mergeScenes(fighters.map((f) => f.result.scene));
+    this.effects = effects;
+    this.restPoses = [];
+    const merged = mergeScenes([...fighters.map((f) => f.result.scene), ...effects.map((e) => e.scene)]);
     this.merged = merged.scene;
     this.parts = merged.parts;
     this.renderer.setScene(merged.scene);
@@ -97,8 +107,26 @@ export class Arena {
     this.renderer.holdFraming({ min: [cx - half, STAGE_BOX.min[1], STAGE_BOX.min[2]], max: [cx + half, STAGE_BOX.max[1], STAGE_BOX.max[2]] });
   }
 
-  /** Pose every fighter and draw the ring. */
-  draw(placements: Placement[], camera: Camera): void {
+  /**
+   * Where a fighter's attachment point is in the world, as last posed: 1 the right hand, 2 the
+   * left, 11 the helm, 34 the chest... Undefined when the model has no such point.
+   */
+  readonly anchor: AnchorAt = (side, attachment) => {
+    const bones = this.bodyBones[side];
+    const place = this.lastPlacements[side];
+    const fighter = this.fighters[side];
+    if (!bones || !place || !fighter) return undefined;
+    const point = fighter.rig.attachment(bones, attachment);
+    if (!point) return undefined;
+    const turn = place.facing < 0 ? -1 : 1;
+    return [place.x + turn * point[0], turn * point[1], place.z + this.floorAt(place.x) + point[2]] as Point;
+  };
+
+  /**
+   * Pose every fighter and draw the ring. `effects`, given the fighters' attachment points this
+   * frame, poses each spell model passed to setFighters, in order.
+   */
+  draw(placements: Placement[], camera: Camera, effects?: (at: AnchorAt) => readonly FxPose[]): void {
     if (!this.merged) return;
     this.fit();
     const size = `${this.canvas.width}x${this.canvas.height}`;
@@ -113,6 +141,23 @@ export class Arena {
       return fighter.rig.pose(place.sequence, place.time);
     });
     const worlds = placements.map((place) => worldMatrix(place.x, place.z + this.floorAt(place.x), place.facing));
+    this.bodyBones = poses.map((pose) => pose[0]?.bones);
+    this.lastPlacements = placements;
+    if (this.effects.length > 0) {
+      const posed = effects?.(this.anchor) ?? [];
+      this.effects.forEach((effect, k) => {
+        const at = posed[k];
+        const world = at?.world ?? HIDDEN;
+        // A folded model keeps its first pose: its bones would not be seen.
+        let pose = world === HIDDEN ? this.restPoses[k] : undefined;
+        if (!pose) {
+          pose = effect.rig.pose(effect.sequence, world === HIDDEN ? 0 : at!.time);
+          if (world === HIDDEN) this.restPoses[k] = pose;
+        }
+        poses.push(pose);
+        worlds.push(world);
+      });
+    }
     this.renderer.setPose(mergedPose(this.parts, poses, worlds, STAGE_BOX));
     if (this.ground.place) {
       // A disc of shade under each fighter, on the floor whether they stand on it or have jumped off it.

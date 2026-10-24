@@ -4,6 +4,7 @@ import { posableRig, type PosableRig } from '@mogshot/model/posable';
 import type { FighterResult, FightSoundSet } from '@mogshot/worker/api';
 import type { DataClient } from '@mogshot/worker/client';
 import { ALL_MOVE_NAMES, type MoveTable, resolveMoves } from '../engine/moves';
+import { type FighterFx, loadFighterFx } from './fx';
 import type { Tile, WeaponKit } from './roster';
 
 /*
@@ -35,6 +36,8 @@ export interface BuiltFighter {
   moves: MoveTable;
   /** The fighter's sounds, read after the build; undefined when they could not be. */
   sounds: Promise<FightSoundSet | undefined>;
+  /** The game's models of the fighter's spells, read the first time they are asked for; none when they could not be. */
+  fx: () => Promise<FighterFx>;
 }
 
 const KEEP = 8;
@@ -157,7 +160,9 @@ export class Fighters {
             console.warn(`${champion.name} has no sound:`, error);
             return undefined;
           });
-        return { champion, result, rig, moves: resolveMoves(result.scene.animations, result.wielding), sounds };
+        let spells: Promise<FighterFx> | undefined;
+        const fx = () => (spells ??= loadFighterFx(this.client, champion.classId, result.wielding));
+        return { champion, result, rig, moves: resolveMoves(result.scene.animations, result.wielding), sounds, fx };
       });
       fighter.catch(() => this.built.delete(champion.key));
       this.built.set(champion.key, fighter);

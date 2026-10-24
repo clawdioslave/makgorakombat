@@ -3,6 +3,8 @@ import type { FloatingText, Match } from '../engine/engine';
 import { directionOf, type FatalityEffect, impactFrame, type SequenceToken, STEP_FRAMES } from '../engine/fatalities';
 import { actionLabel, type InputSource } from '../engine/input';
 import { FINISH_FRAMES, HALF, HP, ROUND_FRAMES } from '../engine/stage';
+import type { AnchorAt } from './fx';
+import { drawSpells } from './fx2d';
 
 /*
  * What is drawn over the ring and belongs to the world: the ground line, the nameplates with
@@ -29,6 +31,8 @@ export interface HudOptions {
   debug?: string;
   /** What each player plays with, for the sequence prompt's key labels; the keyboard by default. */
   sources?: [InputSource, InputSource];
+  /** The fighters' attachment points this frame (hands, chest), for the spells to start and land on. */
+  anchor?: AnchorAt;
 }
 
 export function drawHud(ctx: CanvasRenderingContext2D, width: number, height: number, match: Match, names: [string, string], project: Project, options: HudOptions = {}): void {
@@ -51,7 +55,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, width: number, height: nu
   hurtFlash(ctx, w, h, match, human);
   nameplates(ctx, match, names, at);
   sparks(ctx, match, at);
-  projectiles(ctx, match, at);
+  drawSpells(ctx, match, at, options.anchor ?? (() => undefined));
   fatalityEffects(ctx, w, h, match, at);
   floatingTexts(ctx, match, at, human);
   sequencePrompt(ctx, w, h, match, sources);
@@ -211,40 +215,6 @@ function sparks(ctx: CanvasRenderingContext2D, match: Match, at: (p: readonly [n
 }
 
 /** Spells in flight glow; arrows and shots streak. */
-function projectiles(ctx: CanvasRenderingContext2D, match: Match, at: (p: readonly [number, number, number]) => [number, number] | undefined): void {
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  for (const shot of match.projectiles) {
-    if (shot.ability < 0) {
-      const head = at([shot.x, 0, shot.z]);
-      const tail = at([shot.x - shot.vx * 4, 0, shot.z]);
-      if (!head || !tail) continue;
-      ctx.strokeStyle = 'rgba(255, 240, 200, 0.95)';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(tail[0], tail[1]);
-      ctx.lineTo(head[0], head[1]);
-      ctx.stroke();
-      continue;
-    }
-    for (let trail = 5; trail >= 0; trail--) {
-      const p = at([shot.x - shot.vx * trail * 2, 0, shot.z]);
-      if (!p) continue;
-      const [sx, sy] = p;
-      const radius = 30 - trail * 4;
-      const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, radius);
-      glow.addColorStop(0, `rgba(255, 255, 230, ${trail === 0 ? 1 : 0.3})`);
-      glow.addColorStop(0.35, `rgba(140, 210, 255, ${trail === 0 ? 0.85 : 0.2})`);
-      glow.addColorStop(1, 'rgba(60, 120, 255, 0)');
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(sx, sy, radius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-  ctx.restore();
-}
-
 /** The words of the hit table and the status effects, in white small caps; a crit in yellow. */
 const WHITE = '#f4f1e6';
 const RED = '#ff3b3b';

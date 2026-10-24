@@ -6,6 +6,7 @@ import { type FighterView, fighterView } from '../engine/view';
 import { CAMERA, TICK_MS } from '../engine/stage';
 import { Arena } from './arena';
 import type { BuiltFighter } from './fighters';
+import { type FighterFx, poseFx } from './fx';
 import { drawHud } from './hud';
 import { seedOf } from './pixels';
 import { isMuted, Mixer, toggleMute } from './sound';
@@ -91,6 +92,14 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
   useEffect(() => {
     const ring = new Arena(canvas.current!);
     ring.setFighters(fighters);
+    // The spells' models join the ring once both fighters' are read: one more upload, at the start.
+    let fxs: (FighterFx | undefined)[] = [undefined, undefined];
+    let live = true;
+    void Promise.all(fighters.map((fighter) => fighter.fx())).then((loaded) => {
+      if (!live) return;
+      fxs = loaded;
+      ring.setFighters(fighters, loaded.flatMap((fx) => fx.slots));
+    });
     ring.setGround(stage);
     const names: [string, string] = [fighters[0].champion.name, fighters[1].champion.name];
     const seed = seedOf(fighters[0].champion.key + fighters[1].champion.key) + rematch.current;
@@ -100,11 +109,19 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
     void mixer.load(0, fighters[0].sounds);
     void mixer.load(1, fighters[1].sounds);
     // For scripts and the console: the live match and what the fight sounds like.
-    (window as unknown as { mk?: { match: () => Match; view: (i: 0 | 1) => FighterView; fighters: () => [BuiltFighter, BuiltFighter]; sounds: () => unknown } }).mk = {
+    (window as unknown as { mk?: { match: () => Match; view: (i: 0 | 1) => FighterView; fighters: () => [BuiltFighter, BuiltFighter]; sounds: () => unknown; spells: () => unknown; hold: (on: boolean) => void; anchor: (side: 0 | 1, id: number) => unknown; times: () => unknown } }).mk = {
       match: () => match.current!,
       view: (i) => fighterView(match.current!, i),
       fighters: () => fighters,
       sounds: () => ({ played: mixer.played, sides: mixer.summary() }),
+      spells: () => fxs.map((fx) => fx?.spells),
+      anchor: (side, id) => ring.anchor(side, id),
+      // What F3 shows: ms a frame in the engine, posing and drawing the ring, and the HUD.
+      times: () => ({ ...times }),
+      // Freeze the fight on a frame, still drawn: for scripts that photograph a moment.
+      hold: (on) => {
+        held = on;
+      },
     };
     const input = new InputReader();
     // The keys are read from the window, not the stage element: a click on the DOM frames or anywhere
@@ -114,6 +131,7 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
     stageElement.current!.focus();
 
     let frame = 0;
+    let held = false;
     let last = performance.now();
     let owed = 0;
     const times = { engine: 0, pose: 0, draw: 0 };
@@ -123,7 +141,7 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
     const loop = (now: number) => {
       frame = requestAnimationFrame(loop);
       const current = match.current!;
-      owed += Math.min(now - last, 250);
+      owed = held ? 0 : owed + Math.min(now - last, 250);
       last = now;
       let steps = 0;
       const t0 = performance.now();
@@ -156,6 +174,7 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
       ring.draw(
         current.fighters.map((fighter, i) => ({ ...poseOf(current, i as 0 | 1), x: fighter.x, z: fighter.z, facing: fighter.facing })),
         camera,
+        (at) => poseFx(current, fxs, at).flat(),
       );
       const t2 = performance.now();
       const hud = overlay.current!;
@@ -166,11 +185,12 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
       const ctx = hud.getContext('2d')!;
       times.engine = times.engine * 0.9 + (t1 - t0) * 0.1;
       times.pose = times.pose * 0.9 + (t2 - t1) * 0.1;
-      times.draw = times.draw * 0.9 + (performance.now() - t2) * 0.1;
       const note = debugRef.current
         ? `engine ${times.engine.toFixed(2)} ms · pose+draw ${times.pose.toFixed(2)} ms · hud ${times.draw.toFixed(2)} ms · sounds ${mixer.played}`
         : mutedRef.current ? 'MUTED · M' : undefined;
-      drawHud(ctx, hud.width, hud.height, current, names, (point) => ring.project(camera, point), { human: [true, p2 !== 'cpu'], debug: note, sources: [input.source(0), input.source(1)] });
+      drawHud(ctx, hud.width, hud.height, current, names, (point) => ring.project(camera, point), { human: [true, p2 !== 'cpu'], debug: note, sources: [input.source(0), input.source(1)], anchor: ring.anchor });
+      // The HUD's own time, shown the next frame.
+      times.draw = times.draw * 0.9 + (performance.now() - t2) * 0.1;
     };
     frame = requestAnimationFrame(loop);
 
@@ -189,6 +209,7 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
     };
     window.addEventListener('keydown', onKey);
     return () => {
+      live = false;
       cancelAnimationFrame(frame);
       mixer.dispose();
       input.detach();

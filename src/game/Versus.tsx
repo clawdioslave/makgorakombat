@@ -117,6 +117,8 @@ export function Versus({ client, fighters, stages, screens, onFight, onBack }: V
   useEffect(() => {
     const ring = (arena.current ??= new Arena(canvas.current!));
     ring.setFighters(fighters);
+    // The spells' models are read while the players choose the ground, ready for the fight.
+    for (const fighter of fighters) void fighter.fx();
     started.current = performance.now();
     let frame = 0;
     const tick = (now: number) => {
