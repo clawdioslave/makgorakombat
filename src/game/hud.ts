@@ -22,7 +22,15 @@ const HEAD = 2.3;
 
 const ABILITY_KEYS: readonly InputAction[] = ['ability1', 'ability2', 'ability3', 'ability4'];
 
-export function drawHud(ctx: CanvasRenderingContext2D, width: number, height: number, match: Match, names: [string, string], project: Project, debug?: string): void {
+export interface HudOptions {
+  /** Which fighters a person plays: a blow they take floats red, as the game shows damage taken. Both by default. */
+  human?: [boolean, boolean];
+  debug?: string;
+}
+
+export function drawHud(ctx: CanvasRenderingContext2D, width: number, height: number, match: Match, names: [string, string], project: Project, options: HudOptions = {}): void {
+  const { debug } = options;
+  const human = options.human ?? [true, true];
   ctx.clearRect(0, 0, width, height);
   const unit = Math.min(width / 1280, height / 720);
   ctx.save();
@@ -41,7 +49,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, width: number, height: nu
   nameplates(ctx, match, names, at);
   sparks(ctx, match, at);
   projectiles(ctx, match, at);
-  floatingTexts(ctx, match, at);
+  floatingTexts(ctx, match, at, human);
   actionBars(ctx, w, h, match);
   banner(ctx, w, h, match);
 
@@ -118,6 +126,16 @@ function healthBars(ctx: CanvasRenderingContext2D, w: number, match: Match, name
     ctx.strokeStyle = GOLD;
     ctx.lineWidth = 2;
     ctx.strokeRect(x0, top, barWidth, barHeight);
+    // The health as a number.
+    ctx.font = `700 14px ${SERIF}`;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = i === 0 ? 'right' : 'left';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    const hpText = `${Math.ceil(fighter.hp)} / ${HP}`;
+    ctx.strokeText(hpText, i === 0 ? x0 + barWidth - 8 : x0 + 8, top + barHeight / 2 + 1);
+    ctx.fillStyle = BONE;
+    ctx.fillText(hpText, i === 0 ? x0 + barWidth - 8 : x0 + 8, top + barHeight / 2 + 1);
     // The resource.
     const ry = top + barHeight + 4;
     fill(1, '#14110f', ry, 10);
@@ -290,43 +308,84 @@ function projectiles(ctx: CanvasRenderingContext2D, match: Match, at: (p: readon
   ctx.restore();
 }
 
-const TEXT_STYLE: Record<FloatingText['kind'], { size: number; colour: string; font: string }> = {
-  damage: { size: 26, colour: BONE, font: HEAVY },
-  crit: { size: 40, colour: GOLD, font: HEAVY },
-  dot: { size: 20, colour: '#c084fc', font: HEAVY },
-  heal: { size: 26, colour: '#7bd88f', font: HEAVY },
-  absorb: { size: 20, colour: '#dfe6ff', font: HEAVY },
-  miss: { size: 22, colour: '#bdb7a8', font: HEAVY },
-  dodge: { size: 22, colour: '#bdb7a8', font: HEAVY },
-  parry: { size: 22, colour: '#e6e6f0', font: HEAVY },
-  block: { size: 22, colour: '#8cc8ff', font: HEAVY },
-  status: { size: 22, colour: '#ffb347', font: HEAVY },
-  info: { size: 13, colour: '#ff8a8a', font: SERIF },
-};
+/** The words of the hit table and the status effects, in white small caps; a crit in yellow. */
+const WHITE = '#f4f1e6';
+const RED = '#ff3b3b';
 
-/** Numbers and words rise off the fighter they concern and fade; a crit pops in bigger. */
-function floatingTexts(ctx: CanvasRenderingContext2D, match: Match, at: (p: readonly [number, number, number]) => [number, number] | undefined): void {
+interface TextStyle {
+  size: number;
+  colour: string;
+  font: string;
+  /** A word, drawn in the serif small caps; a number in the heavy face. */
+  word: boolean;
+}
+
+/**
+ * How a floating text looks: numbers are white when dealt by a player's fighter, red when a
+ * player's fighter takes them from the computer, yellow and large for a crit; words are white.
+ */
+function styleOf(text: FloatingText, human: [boolean, boolean]): TextStyle {
+  const incoming = human[text.side] && !human[text.from];
+  switch (text.kind) {
+    case 'damage':
+      return { size: 26, colour: incoming ? RED : WHITE, font: HEAVY, word: false };
+    case 'crit':
+      return { size: 40, colour: incoming ? RED : GOLD, font: HEAVY, word: false };
+    case 'dot':
+      return { size: 18, colour: incoming ? RED : WHITE, font: HEAVY, word: false };
+    case 'heal':
+      return { size: 26, colour: '#7bd88f', font: HEAVY, word: false };
+    case 'absorb':
+    case 'block':
+      return { size: 18, colour: WHITE, font: SERIF, word: true };
+    case 'miss':
+    case 'dodge':
+    case 'parry':
+    case 'immune':
+      return { size: 19, colour: WHITE, font: SERIF, word: true };
+    case 'status':
+      return { size: 18, colour: '#ffb347', font: SERIF, word: true };
+    case 'info':
+      return { size: 13, colour: '#ff8a8a', font: SERIF, word: true };
+  }
+}
+
+/**
+ * Numbers and words rise off the head of the fighter they concern, above the nameplate, fanning a
+ * little left and right so hits that land together do not overlap, and fade over 1.2 s. A crit
+ * arrives large and bounces into place.
+ */
+function floatingTexts(ctx: CanvasRenderingContext2D, match: Match, at: (p: readonly [number, number, number]) => [number, number] | undefined, human: [boolean, boolean]): void {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   // Texts born on the same frame over the same fighter stack up instead of overlapping.
   const stack: Record<string, number> = {};
   for (const text of match.texts) {
-    const style = TEXT_STYLE[text.kind];
+    const style = styleOf(text, human);
     const key = `${text.side}:${text.t}`;
     const slot = stack[key] ?? 0;
     stack[key] = slot + 1;
     const p = at([text.x, 0, text.z]);
     if (!p) continue;
-    const rise = text.kind === 'info' ? text.t * 0.4 : text.t * 0.9;
-    const x = p[0];
-    const y = p[1] - rise - slot * 24 + (text.kind === 'info' ? 60 : 0);
-    const fade = Math.min(1, (text.life - text.t) / 15);
-    const pop = text.kind === 'crit' ? 1 + Math.max(0, 1 - text.t / 6) * 0.6 : 1;
+    const born = match.frame - text.t;
+    // The fan: each text takes a lane from -2 to 2 by its birth frame, so a stream of hits spreads out.
+    const lane = text.kind === 'info' ? 0 : ((born * 7 + slot * 3) % 5) - 2;
+    const rise = text.kind === 'info' ? text.t * 0.4 : text.t * 0.85;
+    const x = p[0] + lane * 16;
+    const y = text.kind === 'info' ? p[1] + 60 - rise : p[1] - 30 - rise - slot * 22;
+    const fade = Math.min(1, (text.life - text.t) / 18);
+    let scale = 1;
+    if (text.kind === 'crit') {
+      // Arrives at 1.7×, lands by frame 5, dips to 0.9× and settles by frame 10.
+      scale = text.t < 5 ? 1.7 - 0.14 * text.t : text.t < 10 ? 1 - 0.1 * Math.sin(((text.t - 5) / 5) * Math.PI) : 1;
+    } else if (text.kind === 'damage' || text.kind === 'heal') {
+      scale = text.t < 4 ? 1.25 - 0.0625 * text.t : 1;
+    }
     ctx.save();
     ctx.globalAlpha = fade;
     ctx.translate(x, y);
-    ctx.scale(pop, pop);
-    ctx.font = `${style.font === SERIF ? '700 ' : ''}${style.size}px ${style.font}`;
+    ctx.scale(scale, scale);
+    ctx.font = style.word ? `700 ${style.size}px ${style.font}` : `${style.size}px ${style.font}`;
     ctx.lineWidth = style.size > 30 ? 6 : 4;
     ctx.strokeStyle = 'rgba(20, 5, 5, 0.9)';
     ctx.strokeText(text.text, 0, 0);

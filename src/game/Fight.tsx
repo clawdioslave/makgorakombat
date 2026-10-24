@@ -111,7 +111,7 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
       const note = debugRef.current
         ? `engine ${times.engine.toFixed(2)} ms · pose+draw ${times.pose.toFixed(2)} ms · hud ${times.draw.toFixed(2)} ms · sounds ${mixer.played}`
         : mutedRef.current ? 'MUTED · M' : undefined;
-      drawHud(ctx, hud.width, hud.height, current, names, (point) => ring.project(CAMERA, point), note);
+      drawHud(ctx, hud.width, hud.height, current, names, (point) => ring.project(CAMERA, point), { human: [true, p2 !== 'cpu'], debug: note });
     };
     frame = requestAnimationFrame(loop);
 

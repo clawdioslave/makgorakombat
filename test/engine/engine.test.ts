@@ -172,6 +172,28 @@ describe('the auto-attack', () => {
 });
 
 describe('the hit table', () => {
+  it('a text names who caused it: a blow from the other side, a buff from one\'s own', () => {
+    const match = fighting(1.5, 1, [PRIEST, WARRIOR]);
+    press(match, 0, 2);
+    expect(match.texts.find((t) => t.text === 'SHIELDED')).toMatchObject({ side: 0, from: 0 });
+    swing(match, 1, 'hit');
+    expect(match.texts.find((t) => t.text === 'ABSORB 7')).toMatchObject({ side: 0, from: 1 });
+  });
+
+  it('a fear on a stunned target is IMMUNE', () => {
+    const match = fighting(3, 1, [WARLOCK, WARRIOR]);
+    const target = match.fighters[1];
+    target.state = 'stun';
+    target.move = 'dazed';
+    target.stunT = 300;
+    press(match, 0, 2); // Fear, a 1 s cast
+    rig(match, 'hit');
+    run(match, 61);
+    expect(texts(match, 1)).toContain('immune:IMMUNE');
+    expect(match.texts.find((t) => t.text === 'IMMUNE')).toMatchObject({ side: 1, from: 0 });
+    expect(target.state).toBe('stun');
+  });
+
   it('a plain hit deals the weapon damage, flinches and floats the number', () => {
     const match = fighting(1.5);
     rig(match, 'hit');
@@ -237,7 +259,7 @@ describe('the hit table', () => {
     expect(match.tables[1].moves.parry.animation).toBe('ShieldBlock');
     swing(match, 0, 'block');
     expect(match.fighters[1].hp).toBe(HP - 4);
-    expect(texts(match, 1)).toEqual(['block:BLOCKED 4']);
+    expect(texts(match, 1)).toEqual(['block:BLOCK 4']);
     const bare = fighting(1.5);
     swing(bare, 0, 'block');
     // Without a shield the same roll falls in the crit band.
@@ -518,16 +540,17 @@ describe('abilities', () => {
     swing(match, 1, 'hit');
     expect(match.fighters[0].hp).toBe(HP);
     expect(match.fighters[0].absorb).toBe(18);
-    expect(texts(match, 0)).toContain('absorb:ABSORBED 7');
+    expect(texts(match, 0)).toContain('absorb:ABSORB 7');
     expect(match.fighters[0].tookDamage).toBe(false);
   });
 
   it('Evasion turns a crit roll into a dodge', () => {
     const match = fighting(1.5, 1, [ROGUE, WARRIOR]);
     press(match, 0, 2);
+    expect(texts(match, 0)).toEqual(['status:EVASION']);
     swing(match, 1, 'crit');
     expect(match.fighters[0].hp).toBe(HP);
-    expect(texts(match, 0)).toEqual(['status:EVASION', 'dodge:DODGE']);
+    expect(texts(match, 0)).toContain('dodge:DODGE');
   });
 
   it('Blink puts the mage 3.5 away from the target', () => {

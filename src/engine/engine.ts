@@ -143,7 +143,7 @@ export interface Spark {
   life: number;
 }
 
-export type TextKind = 'damage' | 'crit' | 'dot' | 'heal' | 'absorb' | 'miss' | 'dodge' | 'parry' | 'block' | 'status' | 'info';
+export type TextKind = 'damage' | 'crit' | 'dot' | 'heal' | 'absorb' | 'miss' | 'dodge' | 'parry' | 'block' | 'immune' | 'status' | 'info';
 
 /** Floating combat text: a number or a word that rises over a fighter. */
 export interface FloatingText {
@@ -153,6 +153,8 @@ export interface FloatingText {
   kind: TextKind;
   /** Over whom it floats. */
   side: 0 | 1;
+  /** Who caused it: the other fighter for a blow, the fighter itself for a heal, a buff or a note. */
+  from: 0 | 1;
   t: number;
   life: number;
 }
@@ -221,7 +223,8 @@ export const NO_INPUTS: Readonly<Inputs> = Object.freeze(noInputs());
 
 const BANNER_LIFE = 90;
 const SPARK_LIFE = 14;
-const TEXT_LIFE = 75;
+/** Floating text lives 1.2 s. */
+const TEXT_LIFE = 72;
 const INFO_LIFE = 45;
 const KNOCKDOWN_FRAMES = 30;
 const PROJECTILE_Z = 1.25;
@@ -423,9 +426,9 @@ function helpless(f: Fighter): boolean {
   return f.airborne || f.state === 'stun' || f.state === 'knockdown' || f.state === 'fear' || f.state === 'dazed' || f.state === 'death';
 }
 
-function text(match: Match, side: 0 | 1, kind: TextKind, words: string): void {
+function text(match: Match, side: 0 | 1, kind: TextKind, words: string, from: 0 | 1 = side): void {
   const f = match.fighters[side];
-  match.texts.push({ x: f.x, z: 2.3 + f.z, text: words, kind, side, t: 0, life: kind === 'info' ? INFO_LIFE : TEXT_LIFE });
+  match.texts.push({ x: f.x, z: 2.3 + f.z, text: words, kind, side, from, t: 0, life: kind === 'info' ? INFO_LIFE : TEXT_LIFE });
 }
 
 function spark(match: Match, x: number, z: number, kind: SparkKind): void {
@@ -825,12 +828,12 @@ function damage(match: Match, ai: 0 | 1, ti: 0 | 1, amount: number, kind: 'damag
     target.absorb -= absorbed;
     left -= absorbed;
     if (target.absorb === 0) target.absorbT = 0;
-    text(match, ti, 'absorb', `ABSORBED ${absorbed}`);
+    text(match, ti, 'absorb', `ABSORB ${absorbed}`, ai);
   }
   if (left > 0) {
     target.hp = Math.max(0, target.hp - left);
     target.tookDamage = true;
-    text(match, ti, kind, kind === 'block' ? `BLOCKED ${left}` : String(left));
+    text(match, ti, kind, kind === 'block' ? `BLOCK ${left}` : String(left), ai);
     if (match.tables[ti].kit.resource === 'rage') target.resource = Math.min(MAX_RESOURCE, target.resource + RAGE_ON_HIT);
   }
   if (kind === 'dot') return left;
@@ -848,7 +851,11 @@ function damage(match: Match, ai: 0 | 1, ti: 0 | 1, amount: number, kind: 'damag
 
 function stun(match: Match, ti: 0 | 1, frames: number): void {
   const target = match.fighters[ti];
-  if (target.state === 'death' || target.state === 'dazed') return;
+  if (target.state === 'death') return;
+  if (target.state === 'dazed') {
+    text(match, ti, 'immune', 'IMMUNE', other(ti));
+    return;
+  }
   target.stunT = Math.max(target.stunT, frames);
   cancelCast(target);
   target.dash = undefined;
@@ -858,17 +865,21 @@ function stun(match: Match, ti: 0 | 1, frames: number): void {
   } else {
     play(target, 'stun', 'dazed');
   }
-  text(match, ti, 'status', 'STUNNED');
+  text(match, ti, 'status', 'STUNNED', other(ti));
 }
 
 function fear(match: Match, ti: 0 | 1, frames: number): void {
   const target = match.fighters[ti];
-  if (target.state === 'death' || target.state === 'dazed' || target.state === 'stun') return;
+  if (target.state === 'death') return;
+  if (target.state === 'dazed' || target.state === 'stun') {
+    text(match, ti, 'immune', 'IMMUNE', other(ti));
+    return;
+  }
   target.fearT = frames;
   cancelCast(target);
   target.dash = undefined;
   play(target, 'fear', 'walk');
-  text(match, ti, 'status', 'FEARED');
+  text(match, ti, 'status', 'FEARED', other(ti));
 }
 
 /**
@@ -905,14 +916,14 @@ function strike(match: Match, ai: 0 | 1, ti: 0 | 1, blow: Blow, dir: number, spa
   }
   switch (outcome) {
     case 'miss':
-      text(match, ti, 'miss', 'MISS');
+      text(match, ti, 'miss', 'MISS', ai);
       return 0;
     case 'dodge':
-      text(match, ti, 'dodge', 'DODGE');
+      text(match, ti, 'dodge', 'DODGE', ai);
       if (target.state !== 'attack' && target.state !== 'ability') play(target, 'dodge', 'dodge');
       return 0;
     case 'parry':
-      text(match, ti, 'parry', 'PARRY');
+      text(match, ti, 'parry', 'PARRY', ai);
       if (target.state !== 'attack' && target.state !== 'ability') play(target, 'parry', 'parry');
       target.riposteT = RIPOSTE_FRAMES;
       attacker.hitstop = Math.max(attacker.hitstop, 4);
@@ -958,13 +969,13 @@ function strike(match: Match, ai: 0 | 1, ti: 0 | 1, blow: Blow, dir: number, spa
   if (a.interrupt && wasCasting) {
     cancelCast(target);
     target.lockoutT = LOCKOUT_FRAMES;
-    text(match, ti, 'status', 'INTERRUPTED');
+    text(match, ti, 'status', 'INTERRUPTED', ai);
   }
   if (a.stun > 0) stun(match, ti, a.stun);
   if (a.fear > 0) fear(match, ti, a.fear);
   if (a.slow > 0) {
     target.slowT = Math.max(target.slowT, a.slow);
-    text(match, ti, 'status', 'SLOWED');
+    text(match, ti, 'status', 'SLOWED', ai);
   }
   if (a.dot) {
     const existing = target.dots.find((d) => d.name === a.id);
@@ -974,7 +985,7 @@ function strike(match: Match, ai: 0 | 1, ti: 0 | 1, blow: Blow, dir: number, spa
     } else {
       target.dots.push({ name: a.id, damage: a.dot.damage, ticksLeft: a.dot.ticks, nextTick: DOT_TICK_FRAMES, source: ai });
     }
-    if (amount === 0) text(match, ti, 'status', a.short);
+    if (amount === 0) text(match, ti, 'status', a.short, ai);
   }
   if (a.heal > 0 && a.kind !== 'self') heal(match, ai, a.heal);
   return amount;
