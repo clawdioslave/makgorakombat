@@ -61,7 +61,7 @@ export const LEGENDS: Legend[] = [
   // Retail's black-plate Thrall (npc 253222) and the classic one.
   { slug: 'thrall', name: 'Thrall', title: 'Warchief of the Horde', faction: 'horde', displays: [19015, 4527], weapons: [{ mainHand: 128819 }, { mainHand: 270931 }, { mainHand: 12183 }], classId: 7 },
   // Only the classic beta has her banshee queen look on a player model; every retail look is a model of her own.
-  { slug: 'sylvanas', name: 'Sylvanas Windrunner', title: 'Banshee Queen', faction: 'horde', displays: [11657], weapons: [{ mainHand: 128826 }, { mainHand: 5258 }], classId: 3 },
+  { slug: 'sylvanas', name: 'Sylvanas Windrunner', title: 'Banshee Queen', faction: 'horde', displays: [11657], weapons: [{ mainHand: 128826 }, { mainHand: 5259 }], classId: 3 },
   { slug: 'malfurion', name: 'Malfurion Stormrage', title: 'Archdruid', faction: 'alliance', displays: [127688, 39162], weapons: [{ mainHand: 128306 }], classId: 11 },
   // Before the Betrayer: the Moon Guard captain of the War of the Ancients. The demon hunter is a model of his own.
   { slug: 'illidan', name: 'Illidan Stormrage', title: 'Captain of the Moon Guard', faction: 'neutral', displays: [72623], weapons: [{ mainHand: 32837, offHand: 32838 }, { mainHand: 18583, offHand: 18584 }], classId: 12 },
