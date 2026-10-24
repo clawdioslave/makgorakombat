@@ -3,6 +3,7 @@ import type { ClassEntry, Race } from '@mogshot/character/appearance';
 import type { ImportedRecord } from '@mogshot/import/record';
 import { BRAND } from '../engine/brand';
 import { type BuiltFighter, type Champion, type Fighters } from './fighters';
+import { headshotOf, storedHeadshot } from './headshot';
 import { Preview } from './Preview';
 import { championTiles, classesOf, cycleClass, factionOf, gridMove, randomTile, rosterTiles, sexFor, type Tile } from './roster';
 import { Guide, type GuidePage } from './Guide';
@@ -97,6 +98,12 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
   });
   const playersRef = useRef(players);
   playersRef.current = players;
+  // Each champion's own face by its key, drawn from the built model; the legends' and the player's own are drawn ahead of time.
+  const [headshots, setHeadshots] = useState<Map<string, string>>(() => new Map());
+  const face = (built: BuiltFighter) => {
+    const url = headshotOf(built);
+    if (url) setHeadshots((current) => (current.get(built.champion.key) === url ? current : new Map(current).set(built.champion.key, url)));
+  };
   const guideRef = useRef(guide);
   guideRef.current = guide;
   const p2Ref = useRef(p2);
@@ -135,6 +142,7 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
         const built = await fighters.get(champion);
         if (requests.current[who] !== id) return;
         update(who, (p) => ({ ...p, built, building: false, error: undefined }));
+        face(built);
       })
       .catch((cause: unknown) => {
         if (requests.current[who] !== id) return;
@@ -152,6 +160,41 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
     return () => timers.forEach((timer) => timer !== undefined && clearTimeout(timer));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [players[0].cursor, players[0].sex, players[0].classId, players[1].cursor, players[1].sex, players[1].classId]);
+
+  // Every legend and every champion of the player's own gets its face drawn in the background, one at a
+  // time, waiting whenever a player's own summon is in flight so the cursor never queues behind it.
+  useEffect(() => {
+    let stopped = false;
+    const wanted = [...legends, ...champions].filter((tile) => tile.kind === 'legend' || tile.kind === 'record');
+    const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+    void (async () => {
+      await pause(800);
+      for (const tile of wanted) {
+        if (stopped) return;
+        if (tile.kind !== 'legend' && tile.kind !== 'record') continue;
+        const key = tile.kind === 'record' ? `record:${tile.record.key}` : `legend:${tile.legend.slug}:${tile.displayId}`;
+        const stored = storedHeadshot(key);
+        if (stored) {
+          setHeadshots((current) => (current.has(key) ? current : new Map(current).set(key, stored)));
+          continue;
+        }
+        while (!stopped && playersRef.current.some((player) => player.building)) await pause(250);
+        if (stopped) return;
+        try {
+          const champion = await fighters.champion(tile, tile.kind === 'record' ? tile.record.sex : tile.sex, undefined);
+          if (!champion || stopped) continue;
+          face(await fighters.get(champion));
+        } catch (cause) {
+          console.warn(`${nameOf(tile)}: no face:`, cause);
+        }
+        await pause(150);
+      }
+    })();
+    return () => {
+      stopped = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [legends, champions]);
 
   const keyOf = (tile: Tile | undefined, player: Player) => {
     if (!tile || tile.kind === 'random') return undefined;
@@ -300,14 +343,22 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
           <span class="random">?</span>
         ) : tile.kind === 'legend' ? (
           <>
-            <img src={legendPortrait(tile.legend.slug)} alt={tile.legend.name} title={`${tile.legend.name}, ${tile.legend.title}`} draggable={false} />
+            <img
+              class={headshots.has(`legend:${tile.legend.slug}:${tile.displayId}`) ? 'face' : ''}
+              src={headshots.get(`legend:${tile.legend.slug}:${tile.displayId}`) ?? legendPortrait(tile.legend.slug)}
+              alt={tile.legend.name}
+              title={`${tile.legend.name}, ${tile.legend.title}`}
+              draggable={false}
+            />
             {/* The first name alone: the strip has no room for "Tyrande Whisperwind", and the plate says the rest. */}
             <span class="name">{tile.legend.name.split(' ')[0]}</span>
           </>
         ) : (
           <>
             {/* Each player's sex shows on their own cursor; otherwise the race's first. */}
-            {portraitOf(tile, here[0] ? players[0].sex : here[1] ? players[1].sex : tile.race.sexes[0] ?? 0) ? (
+            {tile.kind === 'record' && headshots.has(`record:${tile.record.key}`) ? (
+              <img class="face" src={headshots.get(`record:${tile.record.key}`)} alt={tile.record.name} draggable={false} />
+            ) : portraitOf(tile, here[0] ? players[0].sex : here[1] ? players[1].sex : tile.race.sexes[0] ?? 0) ? (
               <img src={portraitOf(tile, here[0] ? players[0].sex : here[1] ? players[1].sex : tile.race.sexes[0] ?? 0)} alt={tile.race.name} draggable={false} />
             ) : (
               <span class="noface">{tile.race.name}</span>

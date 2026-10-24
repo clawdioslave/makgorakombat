@@ -729,6 +729,13 @@ code {
   filter: none;
 }
 
+/* A face drawn from the model is head and shoulders on a transparent ground: a dark glow sits behind it, and the tile zooms in to the face as the race pictures are. */
+.tile img.face {
+  background: radial-gradient(circle at 50% 40%, #4a2a2e 0%, #1a1012 60%, #0b0708 100%);
+  transform: scale(1.35);
+  transform-origin: 50% 32%;
+}
+
 .tile.create {
   display: grid;
   place-items: center;

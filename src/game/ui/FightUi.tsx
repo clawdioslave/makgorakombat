@@ -7,6 +7,7 @@ import { keyLabel } from '../../engine/input';
 import { ROUNDS_TO_WIN } from '../../engine/stage';
 import { type FighterView, fighterView } from '../../engine/view';
 import type { BuiltFighter } from '../fighters';
+import { headshotOf } from '../headshot';
 import type { Source } from '../Select';
 import { FightBar } from './FightBar';
 import { Icons, type UiAssets } from './icons';
@@ -121,7 +122,11 @@ export function FightUi({ fighters, p2, assets }: FightUiProps) {
     setAbilityIcons([sides[0]!, sides[1]!]);
   };
 
-  const portraits = useMemo(() => [icons.portrait(fighters[0].champion), icons.portrait(fighters[1].champion)] as const, [icons, fighters]);
+  // The champion's own face, drawn from the model; the race's stock picture when it cannot be.
+  const portraits = useMemo(
+    () => [headshotOf(fighters[0]) ?? icons.portrait(fighters[0].champion), headshotOf(fighters[1]) ?? icons.portrait(fighters[1].champion)] as const,
+    [icons, fighters],
+  );
 
   if (!frame) return <div class="wowui" />;
   const human: [boolean, boolean] = [true, p2 !== 'cpu'];
