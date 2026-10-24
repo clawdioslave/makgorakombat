@@ -5,7 +5,8 @@ import { BRAND } from '../engine/brand';
 import { type BuiltFighter, type Champion, type Fighters } from './fighters';
 import { Preview } from './Preview';
 import { championTiles, classesOf, cycleClass, factionOf, gridMove, randomTile, rosterTiles, sexFor, type Tile } from './roster';
-import { Logo } from './Title';
+import { Guide, type GuidePage } from './Guide';
+import { LogoArt } from './Title';
 
 /*
  * CHOOSE YOUR CHAMPION. Every race on a grid of the game's own portraits, the player's own
@@ -85,6 +86,7 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
     return rows;
   }, [legends, champions, roster]);
   // The ring opens on Tyrande against Thrall when the folder has them; otherwise on the roster.
+  const [guide, setGuide] = useState<GuidePage>();
   const [players, setPlayers] = useState<[Player, Player]>(() => {
     const opening = (slug: string, sex: number): Player => {
       const index = legends.findIndex((tile) => tile.kind === 'legend' && tile.legend.slug === slug);
@@ -95,6 +97,8 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
   });
   const playersRef = useRef(players);
   playersRef.current = players;
+  const guideRef = useRef(guide);
+  guideRef.current = guide;
   const p2Ref = useRef(p2);
   p2Ref.current = p2;
   // Each player's newest build request; older ones that finish late are dropped.
@@ -193,6 +197,7 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
   // Keys: both players on one keyboard.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (guideRef.current) return;
       if (event.code === 'Escape') {
         const [a, b] = playersRef.current;
         if (a.locked || b.locked) setPlayers([{ ...a, locked: false }, { ...b, locked: false }]);
@@ -339,7 +344,7 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
   return (
     <div class="screen select">
       <header>
-        <Logo small />
+        <LogoArt small />
         <h1>{BRAND.choose}</h1>
       </header>
       <div class="sides">
@@ -354,12 +359,14 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
               <div class="tiles legends">{legends.map((tile, i) => tileView(tile, 'legends', i))}</div>
             </>
           )}
-          {champions.length > 0 && (
-            <>
-              <div class="label">YOUR CHAMPIONS</div>
-              <div class="tiles champions">{champions.map((tile, i) => tileView(tile, 'champions', i))}</div>
-            </>
-          )}
+          <div class="label">YOUR CHAMPIONS</div>
+          <div class="tiles champions">
+            {champions.map((tile, i) => tileView(tile, 'champions', i))}
+            <button class="tile create" type="button" onClick={() => setGuide('champion')} title="How to get your own characters into the ring">
+              <span class="plus">+</span>
+              {champions.length > 0 ? 'ADD A CHAMPION' : 'CREATE YOUR CHAMPION'}
+            </button>
+          </div>
           <div class="label">THE RACES OF AZEROTH</div>
           <div class="tiles roster" style={{ gridTemplateColumns: `repeat(${COLUMNS}, 1fr)` }}>
             {roster.map((tile, i) => tileView(tile, 'roster', i))}
@@ -375,6 +382,7 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
         <span><b>P2</b> arrows · , or Num1 choose · M back · Right Shift ♂/♀ · . / class</span>
         <span><b>Tab</b> player 2: {p2} · <b>Esc</b> back</span>
       </footer>
+      {guide && <Guide page={guide} onPage={setGuide} onClose={() => setGuide(undefined)} />}
     </div>
   );
 }

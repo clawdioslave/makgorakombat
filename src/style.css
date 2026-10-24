@@ -196,13 +196,18 @@ code {
   background: radial-gradient(ellipse at 50% 30%, #2b1416 0%, var(--bg) 60%, #000 100%);
 }
 
-.title .logo-art {
+.logo-art {
   margin: 0 0 -8px;
   width: min(620px, 72vw);
   line-height: 0;
 }
 
-.title .logo-art img {
+.logo-art.small {
+  width: 220px;
+  margin: -14px 0 -18px;
+}
+
+.logo-art img {
   width: 100%;
   height: auto;
   /* The art sits on black: screened onto the page, the black goes and the glow stays. */
@@ -211,13 +216,19 @@ code {
   animation: slam 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 
-.title .drop,
+.title .actionbar,
+.title .hint,
+.title .opening,
 .title .credits,
 .title .logo,
 .title .tagline,
 .title .billing {
   position: relative;
   z-index: 1;
+}
+
+.title .actionbar {
+  margin-top: 6px;
 }
 
 .title {
@@ -236,34 +247,249 @@ code {
   opacity: 0.85;
 }
 
-.drop {
-  width: min(640px, 92vw);
-  padding: 34px 28px;
-  border: 2px dashed var(--line);
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.45);
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.drop.over {
-  border-color: var(--gold);
+.title.over::after {
+  content: 'DROP IT';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
   background: rgba(255, 209, 0, 0.08);
+  border: 4px dashed var(--gold);
+  font-family: var(--heavy);
+  font-size: 5rem;
+  color: var(--gold);
+  pointer-events: none;
+  z-index: 5;
 }
 
-.drop p {
-  margin: 0 0 12px;
+.title .hint {
+  max-width: 620px;
+  margin: 0;
+  padding: 10px 18px;
+  text-align: center;
+  color: var(--dim);
+  background: rgba(8, 4, 5, 0.7);
+  border-radius: 8px;
 }
 
-.drop .big {
+.title .hint b {
+  color: var(--text);
+}
+
+.title .opening {
+  padding: 24px 32px;
+  text-align: center;
+  background: rgba(8, 4, 5, 0.8);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.title .opening p {
+  margin: 0 0 8px;
+}
+
+.title .opening .big {
   font-family: var(--serif);
   font-weight: 700;
   font-size: 1.15rem;
   letter-spacing: 0.08em;
   color: var(--gold);
+  animation: pulse 1.4s ease-in-out infinite;
 }
 
-.drop.opening .big {
-  animation: pulse 1.4s ease-in-out infinite;
+/* ---- the action bar ------------------------------------------------------------------- */
+
+.actionbar {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px 8px;
+  background:
+    linear-gradient(180deg, rgba(60, 40, 30, 0.9), rgba(20, 12, 10, 0.95)),
+    #1a1012;
+  border: 2px solid #6b5020;
+  border-radius: 6px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 140, 0.25),
+    0 10px 30px rgba(0, 0, 0, 0.8);
+}
+
+.actionbar .slot {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  place-items: center;
+  padding: 0;
+  margin: 0;
+  border: 2px solid #8a6a2a;
+  border-radius: 5px;
+  background:
+    radial-gradient(circle at 50% 35%, #3a2420 0%, #150c0c 70%),
+    #150c0c;
+  color: #c9b27a;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow:
+    inset 0 0 0 1px #000,
+    inset 0 0 18px rgba(0, 0, 0, 0.8);
+  transition: transform 0.08s, box-shadow 0.08s, border-color 0.08s;
+}
+
+.actionbar .slot:hover,
+.actionbar .slot:focus-visible {
+  border-color: var(--gold);
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 0 0 1px #000,
+    0 0 18px rgba(255, 209, 0, 0.45);
+  outline: none;
+}
+
+.actionbar .slot:active {
+  transform: translateY(1px);
+}
+
+.actionbar .slot.lit {
+  color: var(--gold);
+  border-color: var(--gold);
+  box-shadow:
+    inset 0 0 0 1px #000,
+    0 0 16px rgba(255, 209, 0, 0.5);
+  animation: glow 1.8s ease-in-out infinite;
+}
+
+@keyframes glow {
+  50% {
+    box-shadow:
+      inset 0 0 0 1px #000,
+      0 0 28px rgba(255, 209, 0, 0.85);
+  }
+}
+
+.actionbar .slot .icon {
+  width: 38px;
+  height: 38px;
+  margin-top: 8px;
+  filter: drop-shadow(0 2px 2px #000);
+}
+
+.actionbar .slot .icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.actionbar .slot .hotkey {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #f4f1e6;
+  text-shadow: 0 1px 2px #000;
+}
+
+.actionbar .slot .label {
+  width: 100%;
+  padding: 3px 2px 4px;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+  color: var(--gold);
+  background: rgba(0, 0, 0, 0.6);
+  border-top: 1px solid rgba(255, 209, 0, 0.25);
+  line-height: 1.1;
+}
+
+/* ---- the guide ------------------------------------------------------------------------ */
+
+.guide-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.guide {
+  width: min(760px, 94vw);
+  max-height: 88vh;
+  overflow: auto;
+  background: linear-gradient(180deg, #1d1214, #0e0809);
+  border: 2px solid #8a6a2a;
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
+}
+
+.guide .tabs {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+}
+
+.guide .tabs button {
+  padding: 12px 18px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--dim);
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+}
+
+.guide .tabs button.here {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+
+.guide .tabs .close {
+  margin-left: auto;
+  font-family: inherit;
+  letter-spacing: 0;
+}
+
+.guide .body {
+  padding: 18px 24px 22px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.guide ol {
+  padding-left: 22px;
+}
+
+.guide li {
+  margin-bottom: 10px;
+}
+
+.guide .keys {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0 12px;
+  font-size: 0.9rem;
+}
+
+.guide .keys th,
+.guide .keys td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.guide .keys th {
+  color: var(--gold);
+  font-family: var(--serif);
+  letter-spacing: 0.08em;
+}
+
+.guide .keys td:first-child {
+  color: var(--dim);
 }
 
 @keyframes pulse {
@@ -500,6 +726,32 @@ code {
 .tile.p1 img,
 .tile.p2 img {
   filter: none;
+}
+
+.tile.create {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  text-align: center;
+  border-style: dashed;
+  border-color: #8a6a2a;
+  color: var(--gold);
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+}
+
+.tile.create:hover {
+  border-color: var(--gold);
+  background: rgba(255, 209, 0, 0.08);
+}
+
+.tile.create .plus {
+  font-family: var(--heavy);
+  font-size: 2rem;
+  line-height: 1;
 }
 
 .tile .noface {
