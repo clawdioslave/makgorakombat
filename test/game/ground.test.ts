@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { identity } from '@mogshot/math/mat4';
 import { PLACE_VERTEX_SIZE, type PlaceScene } from '@mogshot/world/place';
 import { floorAt, floorProfile } from '../../src/game/ground';
-import { STAGES } from '../../src/game/stages';
+import { existsSync } from 'node:fs';
+import { STAGES, stagesFor } from '../../src/game/stages';
 
 /** A sheet of ground over x, y in [-10, 10] at the height `z(x)`, as a place's terrain mesh. */
 function sheet(z: (x: number) => number): PlaceScene['terrain'][number] {
@@ -43,5 +44,18 @@ describe('the stages', () => {
     expect(new Set(STAGES.map((s) => s.slug)).size).toBe(STAGES.length);
     for (const stage of STAGES) expect(stage.facing).toBeGreaterThanOrEqual(0);
     for (const stage of STAGES) expect(stage.facing).toBeLessThan(360);
+  });
+
+  it('each ship a thumbnail', () => {
+    for (const stage of STAGES) expect(existsSync(`public/stages/${stage.slug}.jpg`), stage.slug).toBe(true);
+  });
+
+  it('are offered by the maps on disk and the game the install is', () => {
+    const classic = stagesFor([0, 1], 'wow_classic_beta').map((s) => s.slug);
+    expect(classic).toContain('valley-of-heroes');
+    expect(classic).not.toContain('dalaran');
+    const retail = stagesFor([0, 1, 530, 571], 'wow').map((s) => s.slug);
+    expect(retail).toContain('dalaran');
+    expect(retail).not.toContain('valley-of-heroes');
   });
 });

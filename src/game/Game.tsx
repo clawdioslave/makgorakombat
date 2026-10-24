@@ -52,6 +52,7 @@ export function Game() {
     if (openKey === undefined) return;
     let stale = false;
     const data = client.current!;
+    const product = phase.kind === 'ready' ? phase.opened.info.product : '';
     void (async () => {
       try {
         const [races, classes, portraits, screens, looks, maps] = await Promise.all([
@@ -81,7 +82,7 @@ export function Game() {
           classes,
           portraits: { races: urls(portraits.races), classes: urls(portraits.classes) },
           screens,
-          stages: stagesFor(maps.map((map) => map.id)),
+          stages: stagesFor(maps.map((map) => map.id), product),
           legends: legendTiles(LEGENDS, looks, races),
           fighters: new Fighters(data, classes),
         });
