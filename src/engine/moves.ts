@@ -2,6 +2,7 @@ import type { WeaponKind } from '@mogshot/character/equipment';
 import type { AnimationInfo } from '@mogshot/character/scene';
 import { ABILITY_ANIMATIONS, type Kit, resolveKit, type SlotIndex } from './abilities';
 import { finderOf, type HitWindow, type Move, moveFrom, type Variation } from './anim';
+import { FATALITY_ANIMATIONS, resolveFatality, type ResolvedFatality } from './fatalities';
 
 export type { Finder, HitWindow, Move, Variation } from './anim';
 
@@ -33,8 +34,11 @@ export type MoveName =
   | 'intro'
   | 'win';
 
-/** A move a fighter can be in: a core move, or one of the kit's abilities (its own animation, or the one held while casting or dashing). */
-export type MoveRef = MoveName | `ability${SlotIndex}` | `cast${SlotIndex}`;
+/**
+ * A move a fighter can be in: a core move, one of the kit's abilities (its own animation, or the one
+ * held while casting or dashing), or a beat of the class fatality (the winner's `fatalityN`, the loser's `victimN`).
+ */
+export type MoveRef = MoveName | `ability${SlotIndex}` | `cast${SlotIndex}` | `fatality${number}` | `victim${number}`;
 
 export type Wielding = WeaponKind | 'unarmed';
 
@@ -56,6 +60,8 @@ export interface MoveTable {
   moves: Record<MoveName, Move>;
   kit: Kit;
   weapon: Weapon;
+  /** The class fatality's beats, resolved to the model's animations. */
+  fatality: ResolvedFatality;
   /** False when the model has neither JumpStart nor Jump; the jump still happens, in the idle animation. */
   hasJump: boolean;
 }
@@ -152,13 +158,14 @@ export const ALL_MOVE_NAMES: readonly string[] = [
     'CombatExecute', 'CombatFinishingMove', 'Special2H', 'Special1H',
     'BattleRoar', 'EmoteRoar', 'EmoteCheer',
     ...ABILITY_ANIMATIONS,
+    ...FATALITY_ANIMATIONS,
   ]),
 ];
 
 /**
  * Picks a move table out of what a model animates: the first candidate the model has wins.
  * A move with no candidate borrows the idle animation (a jump still jumps, a dodge still dodges).
- * The kit is the class's, or a warrior's (a hunter's behind a bow) when the class is unknown.
+ * The kit and the fatality are the class's, or a warrior's (a hunter's behind a bow) when the class is unknown.
  */
 export function resolveMoves(animations: readonly AnimationInfo[], wielding: Wielding, classId?: number, shield = false): MoveTable {
   const find = finderOf(animations);
@@ -187,7 +194,7 @@ export function resolveMoves(animations: readonly AnimationInfo[], wielding: Wie
     range: ranged ? SHOT_RANGE : MELEE_RANGE,
     shield,
   };
-  return { moves, kit: resolveKit(classId, wielding, find, idle), weapon, hasJump };
+  return { moves, kit: resolveKit(classId, wielding, find, idle), weapon, fatality: resolveFatality(classId, wielding, find, idle), hasJump };
 }
 
 /** The variation a fighter plays: `variation` cycles through the move's list. */

@@ -50,7 +50,7 @@ describe('cpuInputs', () => {
     }
   });
 
-  it('goes for an ability in the finish', () => {
+  it('performs its fatality in the finish', () => {
     const match = fakeMatch(3);
     skipIntro(match);
     place(match, 1.5);
@@ -60,6 +60,26 @@ describe('cpuInputs', () => {
     rig(match, 'hit');
     tick(match, [inputs(), inputs({ attack: true })]);
     expect(until(match, (m) => m.phase === 'finish', 60)).toBeGreaterThan(0);
+    let frames = 0;
+    while (frames < 300 && match.phase === 'finish') {
+      cpuTick(match);
+      frames++;
+    }
+    // It enters its class sequence and the fatality plays; see fatalities.test.ts for the scene.
+    expect(match.phase).toBe('fatality');
+    expect(match.fighters[1].state).toBe('finisher');
+  });
+
+  it('late in the window, with no sequence left to enter, it ends the finish plainly', () => {
+    const match = fakeMatch(3);
+    skipIntro(match);
+    place(match, 1.5);
+    match.fighters[0].hp = 7;
+    match.fighters[1].resource = 60;
+    rig(match, 'hit');
+    tick(match, [inputs(), inputs({ attack: true })]);
+    expect(until(match, (m) => m.phase === 'finish', 60)).toBeGreaterThan(0);
+    match.phaseT = 200;
     let frames = 0;
     while (frames < 200 && match.phase === 'finish') {
       cpuTick(match);

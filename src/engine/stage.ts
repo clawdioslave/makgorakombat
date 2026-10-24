@@ -37,8 +37,8 @@ export const ROUND_FRAMES = 3600;
 export const HP = 100;
 /** "ROUND n" then "FIGHT!" before the fighters can move. */
 export const INTRO_FRAMES = 150;
-/** How long the dazed loser can be finished before dropping on their own. */
-export const FINISH_FRAMES = 180;
+/** How long the dazed loser can be finished before dropping on their own: 4 s, room to enter a fatality's sequence. */
+export const FINISH_FRAMES = 240;
 /** Slow motion on the knockout. `frames` is counted in real frames. */
 export const KO_SLOWMO = { frames: 90, rate: 0.3 };
 /** Winner celebrates, then the next round (or the match result). */

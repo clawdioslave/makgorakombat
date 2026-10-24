@@ -1,6 +1,12 @@
 import { ABILITY_SLOTS } from './abilities';
 import { abilityBlocked, type Inputs, type Match, nextRandom, noInputs } from './engine';
+import { directionOf } from './fatalities';
 import { FINISH_FRAMES, HALF } from './stage';
+
+/** Past this share of the finish window the CPU gives up on the sequence and ends it plainly. */
+const SEQUENCE_UNTIL = 0.72;
+/** The chance the CPU fumbles a key once per finish. */
+const FUMBLE = 0.35;
 
 /** How often the CPU makes up its mind, in frames; it holds its inputs in between. */
 export const CPU_DECIDE_FRAMES = 8;
@@ -65,9 +71,25 @@ function decide(match: Match, me: 0 | 1): Inputs {
   // Let a cast finish.
   if (f.state === 'cast') return out;
 
-  // The finish: close in and end it with an ability; failing that, with a plain blow.
+  // The finish: enter the class fatality's sequence, one key per decision with a rest between so each
+  // is its own press, fumbling one key now and then; late in the window, or after too many
+  // fumbles, close in and end it with an ability or, failing that, a plain blow.
   if (match.phase === 'finish') {
     if (opp.state !== 'dazed') return out;
+    const s = match.sequence;
+    if (s && match.roundWinner === me && match.phaseT < FINISH_FRAMES * SEQUENCE_UNTIL) {
+      const previous = match.cpu[me].held;
+      if (previous.left || previous.right || previous.attack || previous.abilities.some(Boolean)) return out;
+      if (s.penaltyT > 0) return out;
+      const sequence = table.fatality.spec.sequence;
+      let token = sequence[s.progress]!;
+      if (s.fails === 0 && s.progress === 1 && nextRandom(match) < FUMBLE) token = sequence.find((t) => t !== token) ?? token;
+      const key = directionOf(token, f.facing);
+      if (key) out[key] = true;
+      else if (token === 'attack') out.attack = true;
+      else press(Number(token.slice(7)) - 1);
+      return out;
+    }
     const ready = usable().filter((n) => kit.abilities[n]!.kind !== 'self' && kit.abilities[n]!.kind !== 'blink' && kit.abilities[n]!.kind !== 'leap');
     if (ready.length > 0) {
       press(ready[Math.floor(nextRandom(match) * ready.length)]!);

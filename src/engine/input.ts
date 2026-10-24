@@ -46,6 +46,16 @@ export function keyLabel(player: 0 | 1, action: InputAction): string {
   return KEY_LABELS[code] ?? code;
 }
 
+/** Short labels for a standard gamepad's buttons per action. */
+export const GAMEPAD_LABELS: Readonly<Record<InputAction, string>> = {
+  left: '←', right: '→', jump: 'Y', attack: 'RT', ability1: 'A', ability2: 'B', ability3: 'X',
+};
+
+/** The label of a player's key or button for an action, by what they play with; the CPU is shown player 2's keys. */
+export function actionLabel(player: 0 | 1, source: InputSource, action: InputAction): string {
+  return source === 'gamepad' ? GAMEPAD_LABELS[action] : keyLabel(player, action);
+}
+
 /** Standard-mapping gamepad buttons per action: abilities on A B X, auto-attack on the right trigger, jump on Y, the bumpers or up. */
 export const GAMEPAD_BUTTONS: Record<InputAction, readonly number[]> = {
   left: [14],

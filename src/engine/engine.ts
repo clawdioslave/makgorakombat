@@ -1,5 +1,6 @@
 import { ABILITY_MELEE_RANGE, ABILITY_SLOTS, DOT_TICK_FRAMES, EXECUTE_BELOW, GCD_FRAMES, MAX_RESOURCE, RESOURCE_NAMES, type ResolvedAbility, type SlotIndex } from './abilities';
 import { BRAND } from './brand';
+import { type Beat, directionOf, impactFrame, PENALTY_FRAMES, type SequenceToken, STEP_FRAMES } from './fatalities';
 import { type Move, type MoveRef, type MoveTable, variationOf } from './moves';
 import {
   BACK, BODY, FINISH_FRAMES, GRAVITY, HALF, HP, INTRO_FRAMES, JUMP_V, KO_SLOWMO, ROUND_END_FRAMES, ROUND_FRAMES,
@@ -172,7 +173,36 @@ export interface Inputs {
   abilities: [boolean, boolean, boolean];
 }
 
-export type Phase = 'intro' | 'fight' | 'finish' | 'ko' | 'roundEnd' | 'matchEnd';
+export type Phase = 'intro' | 'fight' | 'finish' | 'fatality' | 'ko' | 'roundEnd' | 'matchEnd';
+
+/** The winner's entry of the class fatality's key sequence during the finish window. */
+export interface SequenceEntry {
+  /** Keys of the sequence landed so far. */
+  progress: number;
+  /** Frames left to land the next key; 0 before the first. Running out starts the sequence over. */
+  windowT: number;
+  /** Frames the keys are locked after a wrong one; the HUD flashes red while it runs. */
+  penaltyT: number;
+  /** Wrong keys so far this finish. */
+  fails: number;
+  /** The held keys last tick, so a direction or the attack key counts once per press. */
+  was: { left: boolean; right: boolean; attack: boolean };
+  /** The attack key is still held from a press the sequence took; it swings nothing until released. */
+  attackHeld: boolean;
+}
+
+/** The class fatality playing out: which beat, how far into it. */
+export interface FatalityRun {
+  beat: number;
+  /** Frames into the beat. */
+  t: number;
+  /** Frames since the fatality began. */
+  total: number;
+  /** Where the winner stood when the beat began, for a leap or a hop. */
+  fromX: number;
+  /** Blows landed so far, for the page's camera shake and the mixer. */
+  hits: number;
+}
 
 export interface Banner {
   text: string;
@@ -215,6 +245,10 @@ export interface Match {
   roundWinner: 0 | 1 | undefined;
   winner: 0 | 1 | undefined;
   cpu: [CpuMemory, CpuMemory];
+  /** The fatality sequence being entered, during the finish. */
+  sequence: SequenceEntry | undefined;
+  /** The fatality playing, from its first beat until the round resets. */
+  fatality: FatalityRun | undefined;
 }
 
 export function noInputs(): Inputs {
@@ -326,6 +360,8 @@ function resetRound(match: Match): void {
   match.timer = ROUND_FRAMES;
   match.slowmo = 1;
   match.roundWinner = undefined;
+  match.sequence = undefined;
+  match.fatality = undefined;
   setPhase(match, 'intro');
   showBanner(match, BRAND.round(match.round));
 }
@@ -349,6 +385,8 @@ export function newMatch(tables: [MoveTable, MoveTable], seed: number, names: [s
     roundWinner: undefined,
     winner: undefined,
     cpu: [{ held: noInputs(), next: 0 }, { held: noInputs(), next: 0 }],
+    sequence: undefined,
+    fatality: undefined,
   };
   showBanner(match, BRAND.round(1));
   return match;
@@ -371,11 +409,13 @@ function setPhase(match: Match, phase: Phase): void {
   match.phaseT = 0;
 }
 
-/** The move a reference names: one of the table's, or an ability's own animation or its held one. */
+/** The move a reference names: one of the table's, an ability's own animation or its held one, or a beat of the fatality. */
 export function moveOf(match: Match, i: 0 | 1, ref: MoveRef): Move {
   const table = match.tables[i];
   if (ref.startsWith('ability')) return table.kit.abilities[Number(ref.slice(7))]!.move;
   if (ref.startsWith('cast')) return table.kit.abilities[Number(ref.slice(4))]!.hold;
+  if (ref.startsWith('fatality')) return table.fatality.winner[Number(ref.slice(8))] ?? table.moves.idle;
+  if (ref.startsWith('victim')) return table.fatality.loser[Number(ref.slice(6))] ?? table.moves.idle;
   return table.moves[ref as keyof typeof table.moves];
 }
 
@@ -641,8 +681,10 @@ function applyInputs(match: Match, i: 0 | 1, inputs: Inputs): void {
     f.bufferedT = 0;
     if (useAbility(match, i, n)) return;
   }
-  // The auto-attack goes when its timer is up and the target is in reach.
-  if ((f.auto || f.queued) && f.swingT === 0) {
+  // The auto-attack goes when its timer is up and the target is in reach. In the finish only a fresh tap
+  // swings: a key held through the knockdown must not drop the loser before the sequence can be entered.
+  const wantsSwing = match.phase === 'finish' ? f.queued : f.auto || f.queued;
+  if (wantsSwing && f.swingT === 0) {
     if (inReach(f, o, table.weapon.range, false)) {
       f.variation++;
       play(f, 'attack', 'swing');
@@ -705,7 +747,8 @@ function advanceMove(match: Match, i: 0 | 1): void {
       f.t = duration;
       return;
     default:
-      if (f.state === 'stun' || f.state === 'fear') {
+      // A stun, a fear, the fatality's last beat and a death hold their last frame.
+      if (f.state === 'stun' || f.state === 'fear' || f.state === 'finisher' || f.state === 'death') {
         f.t = duration;
         return;
       }
@@ -1022,7 +1065,205 @@ function knockout(match: Match, winner: 0 | 1): void {
   match.fighters[winner].wins++;
   match.slowmo = KO_SLOWMO.rate;
   match.projectiles.length = 0;
+  match.sequence = undefined;
   setPhase(match, 'ko');
+}
+
+/*
+ * The fatality. During the finish the winner's keys are read as the class sequence: a key that
+ * matches the next step lights it (an attack or ability key is taken, so it swings nothing), a
+ * wrong key starts over and locks the keys for half a second, a step more than 1.5 s after the
+ * last starts over too. The whole sequence starts the scene: beats off the tick clock, the
+ * winner's and loser's poses, motions and blows scripted in fatalities.ts, then DISHONOR! with
+ * the fatality's name and the usual knockout.
+ */
+
+/** Reads the winner's inputs for the sequence and returns what is left for the fight. */
+function readSequence(match: Match, i: 0 | 1, inputs: Inputs): Inputs {
+  const s = match.sequence!;
+  const f = match.fighters[i];
+  const sequence = match.tables[i].fatality.spec.sequence;
+  if (s.penaltyT > 0) s.penaltyT--;
+  if (s.windowT > 0 && --s.windowT === 0) s.progress = 0;
+
+  // This tick's presses, as tokens: a direction relative to the way the winner faces, the attack key, an ability.
+  const pressed: SequenceToken[] = [];
+  const towards = (key: 'left' | 'right'): SequenceToken => (directionOf('back', f.facing) === key ? 'back' : 'forward');
+  if (inputs.left && !s.was.left) pressed.push(towards('left'));
+  if (inputs.right && !s.was.right) pressed.push(towards('right'));
+  if (inputs.attack && !s.was.attack) pressed.push('attack');
+  inputs.abilities.forEach((on, n) => {
+    if (on) pressed.push(`ability${(n + 1) as 1 | 2 | 3}`);
+  });
+  s.was = { left: inputs.left, right: inputs.right, attack: inputs.attack };
+  if (!inputs.attack) s.attackHeld = false;
+
+  let out = inputs;
+  const copy = (): Inputs => {
+    if (out === inputs) out = { ...inputs, abilities: [...inputs.abilities] };
+    return out;
+  };
+  if (s.attackHeld) copy().attack = false;
+
+  for (const token of pressed) {
+    if (s.penaltyT > 0) continue;
+    if (token === sequence[s.progress]) {
+      s.progress++;
+      s.windowT = STEP_FRAMES;
+      if (token === 'attack') {
+        copy().attack = false;
+        s.attackHeld = true;
+      } else if (token.startsWith('ability')) {
+        copy().abilities[Number(token.slice(7)) - 1] = false;
+      }
+      if (s.progress >= sequence.length) {
+        startFatality(match, i);
+        break;
+      }
+    } else if (s.progress > 0 || directionOf(token, f.facing) === undefined) {
+      // A wrong key, once the sequence has begun; a step before it has is just walking.
+      s.progress = 0;
+      s.windowT = 0;
+      s.penaltyT = PENALTY_FRAMES;
+      s.fails++;
+    }
+  }
+  return out;
+}
+
+function fatalityBeat(match: Match): Beat {
+  const winner = match.roundWinner ?? 0;
+  return match.tables[winner].fatality.spec.beats[match.fatality!.beat]!;
+}
+
+function startFatality(match: Match, winner: 0 | 1): void {
+  const w = match.fighters[winner];
+  const l = match.fighters[other(winner)];
+  match.sequence = undefined;
+  match.banner = undefined;
+  match.projectiles.length = 0;
+  w.z = 0;
+  w.vz = 0;
+  w.vx = 0;
+  w.airVx = 0;
+  w.airborne = false;
+  w.knockdownOnLand = false;
+  w.hitstop = 0;
+  w.cast = undefined;
+  w.dash = undefined;
+  w.queued = false;
+  w.auto = false;
+  w.buffered = -1;
+  w.bufferedT = 0;
+  l.vx = 0;
+  l.hitstop = 0;
+  match.fatality = { beat: 0, t: 0, total: 0, fromX: w.x, hits: 0 };
+  setPhase(match, 'fatality');
+  beginBeat(match, 0);
+}
+
+/** The loser takes the beat's part: a flinch, a knockdown, the death. */
+function victim(match: Match, k: number, beat: Beat): void {
+  if (!beat.loser) return;
+  const l = match.fighters[other(match.roundWinner ?? 0)];
+  l.state = beat.loser.state;
+  l.move = `victim${k}`;
+  l.t = 0;
+}
+
+function beginBeat(match: Match, k: number): void {
+  const winner = match.roundWinner ?? 0;
+  const w = match.fighters[winner];
+  const l = match.fighters[other(winner)];
+  const run = match.fatality!;
+  const beat = match.tables[winner].fatality.spec.beats[k]!;
+  run.beat = k;
+  run.t = 0;
+  run.fromX = w.x;
+  w.state = 'finisher';
+  w.move = `fatality${k}`;
+  w.t = 0;
+  match.slowmo = beat.slowmo ?? 1;
+  if (beat.motion === 'behind') {
+    // A step behind the target, or in front of them when the wall is at their back.
+    const toward: 1 | -1 = l.x >= w.x ? 1 : -1;
+    const behind = l.x + toward * (BODY + 0.3);
+    w.x = Math.abs(behind) <= HALF ? behind : l.x - toward * (BODY + 0.3);
+    w.facing = w.x < l.x ? 1 : -1;
+  }
+  if (!beat.impact) victim(match, k, beat);
+}
+
+/** One tick of the scene: clocks, the winner's motion, the beat's blows, the next beat or the end. */
+function fatalityStep(match: Match): void {
+  const run = match.fatality!;
+  const winner = match.roundWinner ?? 0;
+  const w = match.fighters[winner];
+  const l = match.fighters[other(winner)];
+  const beat = fatalityBeat(match);
+  const toward: 1 | -1 = l.x >= w.x ? 1 : -1;
+
+  // The animations run at the beat's time scale; a looping one wraps.
+  w.t += TICK_MS * match.slowmo;
+  const duration = durationOf(match, winner);
+  if (beat.loop && w.t >= duration && duration > 0) w.t %= duration;
+  if (l.state !== 'dazed' || beat.loser) l.t += TICK_MS * match.slowmo;
+
+  const s = run.t / beat.frames;
+  switch (beat.motion) {
+    case 'dash':
+      if (Math.abs(l.x - w.x) > 1.3) w.x += toward * 0.3;
+      break;
+    case 'leap': {
+      const target = l.x - toward * 1.2;
+      w.x = run.fromX + (target - run.fromX) * s;
+      w.z = 1.4 * 4 * s * (1 - s);
+      break;
+    }
+    case 'retreat': {
+      const target = Math.max(-HALF, Math.min(HALF, l.x - toward * 3.8));
+      w.x = run.fromX + (target - run.fromX) * s;
+      w.z = 0.7 * 4 * s * (1 - s);
+      break;
+    }
+    case 'pull':
+      if (Math.abs(l.x - w.x) > 1.2) l.x -= toward * 0.22;
+      break;
+    default:
+      break;
+  }
+  if (beat.motion !== 'leap' && beat.motion !== 'retreat') w.z = 0;
+
+  // The blow lands, and lands again for a volley or a channel.
+  if (beat.impact) {
+    const at = impactFrame(beat);
+    const again = beat.repeat !== undefined && run.t > at && (run.t - at) % beat.repeat === 0;
+    if (run.t === at || again) {
+      spark(match, l.x, 1.3 + l.z, beat.impact);
+      run.hits++;
+      if (run.t === at) {
+        victim(match, run.beat, beat);
+        if (beat.recoil) l.vx = toward * beat.recoil;
+      }
+    }
+  }
+
+  run.t++;
+  run.total++;
+  if (run.t < beat.frames) return;
+  const beats = match.tables[winner].fatality.spec.beats;
+  if (run.beat + 1 < beats.length) beginBeat(match, run.beat + 1);
+  else endFatality(match);
+}
+
+/** The scene is over: the loser is dead, DISHONOR! names the fatality, the round is won. */
+function endFatality(match: Match): void {
+  const winner = match.roundWinner ?? 0;
+  const l = match.fighters[other(winner)];
+  l.hp = 0;
+  if (l.state !== 'death') play(l, 'death', 'death');
+  showBanner(match, BRAND.fatality, match.tables[winner].fatality.spec.name.toUpperCase(), KO_SLOWMO.frames + BANNER_LIFE);
+  knockout(match, winner);
 }
 
 /** Swings and ability animations reaching their window. */
@@ -1147,6 +1388,8 @@ function physics(match: Match): void {
     const o = match.fighters[other(i)];
     if (f.airborne || f.hitstop > 0) continue;
     if (f.state === 'death' || f.state === 'dazed' || f.state === 'knockdown' || f.state === 'stun' || f.state === 'dash') continue;
+    // The fatality's victim keeps the way they faced: a rogue steps behind them.
+    if (match.phase === 'fatality' && i !== match.roundWinner) continue;
     const toward: 1 | -1 = o.x > f.x ? 1 : o.x < f.x ? -1 : f.facing;
     f.facing = f.state === 'fear' ? (toward === 1 ? -1 : 1) : toward;
   }
@@ -1181,6 +1424,8 @@ function checkFinish(match: Match): void {
   if (w.state === 'stun' || w.state === 'fear') play(w, 'idle', 'idle');
   match.projectiles.length = 0;
   match.roundWinner = winner;
+  // The sequence starts clean: a key held through the knockdown is not a press.
+  match.sequence = { progress: 0, windowT: 0, penaltyT: 0, fails: 0, was: { left: false, right: false, attack: w.attackWas }, attackHeld: false };
   setPhase(match, 'finish');
   showBanner(match, BRAND.finish, undefined, FINISH_FRAMES);
 }
@@ -1248,6 +1493,9 @@ function phases(match: Match): void {
         knockout(match, winner);
       }
       return;
+    case 'fatality':
+      fatalityStep(match);
+      return;
     case 'ko':
       if (match.phaseT >= KO_SLOWMO.frames) endRound(match);
       return;
@@ -1269,15 +1517,20 @@ export function tick(match: Match, inputs: [Inputs, Inputs]): void {
     const f = match.fighters[i];
     // (2) Cooldowns, the swing timer, regeneration, casts and the status effects run on.
     if (acting) timers(match, i);
+    // In the finish the winner's keys go to the fatality sequence first; what it takes, the fight never sees.
+    let given = acting ? inputs[i] : NO_INPUTS;
+    if (match.phase === 'finish' && match.sequence && i === match.roundWinner) given = readSequence(match, i, given);
     // (3) The attack key and ability presses are read even when frozen, so a tap is never lost.
-    readKeys(f, acting ? inputs[i] : NO_INPUTS);
+    readKeys(f, given);
     // Hitstop freezes the fighter.
     if (f.hitstop > 0) {
       f.hitstop--;
       continue;
     }
+    // The fatality poses both fighters itself.
+    if (match.phase === 'fatality') continue;
     // (4) Inputs only while fighting.
-    applyInputs(match, i, acting ? inputs[i] : NO_INPUTS);
+    applyInputs(match, i, given);
     // (5) Move clock and transitions.
     advanceMove(match, i);
   }
