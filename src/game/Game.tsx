@@ -49,8 +49,17 @@ export function Game() {
     const data = client.current!;
     void (async () => {
       try {
-        const [races, classes, portraits, screens] = await Promise.all([data.races(), data.classList(), data.portraits(), data.backdrops().catch(() => [] as LoadingScreen[])]);
+        const [races, classes, portraits, screens] = await Promise.all([
+          data.races(),
+          data.classList(),
+          data.portraits().catch((cause: unknown) => {
+            console.warn('The game\'s portraits could not be read:', cause);
+            return { races: {}, classes: {}, problems: [] };
+          }),
+          data.backdrops().catch(() => [] as LoadingScreen[]),
+        ]);
         if (stale) return;
+        if (portraits.problems.length > 0) console.warn('Portraits:', portraits.problems.join('; '));
         const urls = (images: Record<string, Image>) => new Map(Object.entries(images).map(([key, image]) => [key, pictureUrl(image)]));
         setLoaded({
           races,

@@ -257,7 +257,11 @@ export function Select({ races, classes, records, portraits, fighters, p2, onP2,
         ) : (
           <>
             {/* Each player's sex shows on their own cursor; otherwise the race's first. */}
-            <img src={portraitOf(tile, here[0] ? players[0].sex : here[1] ? players[1].sex : tile.race.sexes[0] ?? 0)} alt={tile.race.name} draggable={false} />
+            {portraitOf(tile, here[0] ? players[0].sex : here[1] ? players[1].sex : tile.race.sexes[0] ?? 0) ? (
+              <img src={portraitOf(tile, here[0] ? players[0].sex : here[1] ? players[1].sex : tile.race.sexes[0] ?? 0)} alt={tile.race.name} draggable={false} />
+            ) : (
+              <span class="noface">{tile.race.name}</span>
+            )}
             {tile.kind === 'record' && (
               <span class="name">
                 {classKey && portraits.classes.get(classKey) && <img class="class" src={portraits.classes.get(classKey)} alt="" />}

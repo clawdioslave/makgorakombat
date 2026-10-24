@@ -380,6 +380,18 @@ code {
   filter: none;
 }
 
+.tile .noface {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 4px;
+  text-align: center;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--gold);
+}
+
 .tile .random {
   display: grid;
   place-items: center;

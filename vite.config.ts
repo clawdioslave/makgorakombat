@@ -12,6 +12,8 @@ export default defineConfig({
   base: '/makgorakombat/',
   plugins: [preact()],
   worker: { format: 'es' },
+  // Only the game's own page is scanned: the submodule's pages pull in things the game does not use.
+  optimizeDeps: { entries: ['index.html'] },
   resolve: { alias: { '@mogshot': mogshot } },
   server: { fs: { allow: ['.', mogshot] } },
   test: {
