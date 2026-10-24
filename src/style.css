@@ -972,3 +972,18 @@ code {
 .versus .controls {
   margin-top: 10px;
 }
+
+/* Legends only: the row is the whole grid, so its tiles grow to fill the middle. */
+.grid.legends-only {
+  justify-content: center;
+}
+
+.grid.legends-only .tiles.legends {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.grid.legends-only .tile .name {
+  font-size: 0.85rem;
+  padding: 4px 6px;
+}

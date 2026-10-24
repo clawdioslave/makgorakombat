@@ -56,6 +56,8 @@ interface Player {
 }
 
 const COLUMNS = 8;
+/** Only the legends on the select screen. */
+const LEGENDS_ONLY = true;
 const HOVER_MS = 200;
 
 const KEYS: Record<number, Record<string, 'up' | 'down' | 'left' | 'right' | 'confirm' | 'back' | 'sex' | 'classPrev' | 'classNext'>> = {
@@ -85,13 +87,20 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
   const roster = useMemo(() => rosterTiles(races), [races]);
   const champions = useMemo(() => championTiles(records, races), [records, races]);
   // The rows from the top, leaving out the empty ones; the cursor moves up and down through them.
+  // For now the ring is for the legends only (William, 24 Oct 2026); the races and your own
+  // characters come back by setting LEGENDS_ONLY to false. An install with no legend the game
+  // can draw still gets the full roster rather than an empty screen.
+  const legendsOnly = LEGENDS_ONLY && legends.length > 0;
   const zones = useMemo(() => {
     const rows: { zone: Cursor['zone']; tiles: Tile[] }[] = [];
     if (legends.length > 0) rows.push({ zone: 'legends', tiles: legends });
+    if (legendsOnly) return rows;
     if (champions.length > 0) rows.push({ zone: 'champions', tiles: champions });
     rows.push({ zone: 'roster', tiles: roster });
     return rows;
-  }, [legends, champions, roster]);
+  }, [legends, champions, roster, legendsOnly]);
+  /** Where the computer and a random pick choose from: the legends alone, or the races. */
+  const pool: { zone: Cursor['zone']; tiles: Tile[] } = legendsOnly ? { zone: 'legends', tiles: legends } : { zone: 'roster', tiles: roster };
   // The ring opens on Tyrande against Thrall when the folder has them; otherwise on the roster.
   const [guide, setGuide] = useState<GuidePage>();
   const [players, setPlayers] = useState<[Player, Player]>(() => {
@@ -294,14 +303,15 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
     const timer = setInterval(() => {
       if (steps-- > 0) {
         update(1, (player) => {
-          const picked = randomTile(roster, draw);
-          return { ...player, cursor: { zone: 'roster', index: picked ? roster.indexOf(picked) : 0 } };
+          const picked = randomTile(pool.tiles, draw);
+          return { ...player, cursor: { zone: pool.zone, index: picked ? pool.tiles.indexOf(picked) : 0 } };
         });
         return;
       }
       clearInterval(timer);
       update(1, (player) => {
         const tile = tileAt(player.cursor);
+        if (tile?.kind === 'legend') return summon(1, { ...player, locked: true });
         if (tile?.kind !== 'race') return player;
         const allowed = classesOf(tile.race, classes);
         const classId = allowed.length > 0 ? allowed[Math.floor(draw() * allowed.length)]!.id : undefined;
@@ -461,13 +471,15 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
           <Preview fighter={players[0].built} locked={players[0].locked} side="left" />
           {plate(0)}
         </div>
-        <div class="grid">
+        <div class={`grid ${legendsOnly ? 'legends-only' : ''}`}>
           {legends.length > 0 && (
             <>
               <div class="label">LEGENDS</div>
               <div class="tiles legends">{legends.map((tile, i) => tileView(tile, 'legends', i))}</div>
             </>
           )}
+          {!legendsOnly && (
+          <>
           <div class="label">YOUR CHAMPIONS</div>
           <div class="tiles champions">
             {champions.map((tile, i) => tileView(tile, 'champions', i))}
@@ -480,6 +492,8 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
           <div class="tiles roster" style={{ gridTemplateColumns: `repeat(${COLUMNS}, 1fr)` }}>
             {roster.map((tile, i) => tileView(tile, 'roster', i))}
           </div>
+          </>
+          )}
         </div>
         <div class="side right">
           <Preview fighter={players[1].built} locked={players[1].locked} side="right" />
@@ -487,8 +501,8 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
         </div>
       </div>
       <footer class="controls">
-        <span><b>P1</b> WASD move · J choose · H back · U ♂/♀ · K/L class</span>
-        <span><b>P2</b> arrows · , or Num1 choose · M back · Right Shift ♂/♀ · . / class</span>
+        <span><b>P1</b> WASD move · J choose · H back{legendsOnly ? '' : ' · U ♂/♀ · K/L class'}</span>
+        <span><b>P2</b> arrows · , or Num1 choose · M back{legendsOnly ? '' : ' · Right Shift ♂/♀ · . / class'}</span>
         <span><b>Tab</b> player 2: {p2} · <b>Esc</b> back</span>
       </footer>
       {guide && <Guide page={guide} onPage={setGuide} onClose={() => setGuide(undefined)} />}
