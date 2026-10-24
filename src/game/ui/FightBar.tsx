@@ -44,8 +44,12 @@ export function FightBar({ side, view, icons, ranged }: FightBarProps) {
   const swing = view.swing;
   const swingSweep = swing.total > 0 ? Math.min(1, swing.remaining / swing.total) : 0;
   return (
-    <div class={`fightbar p${side + 1}`}>
-      <div class={`slot auto ${swing.auto ? 'on' : ''} ${flashing('attack') ? 'flash' : ''}`} title={ranged ? 'Auto Shot: hold to keep shooting' : 'Attack: hold to keep swinging'}>
+    // A click on the bar must not take the keyboard focus off the stage, or the keys go dead.
+    <div class={`fightbar p${side + 1}`} onMouseDown={(event) => event.preventDefault()}>
+      <div
+        class={`slot auto ${swing.auto ? 'on' : ''} ${swing.inReach ? '' : 'far'} ${flashing('attack') ? 'flash' : ''}`}
+        title={`${ranged ? 'Auto Shot: hold to keep shooting' : 'Attack: hold to keep swinging'}${swing.inReach ? '' : ' — OUT OF RANGE'}`}
+      >
         <Icon url={icons.get('attack')} name={ranged ? 'SHOOT' : 'ATTACK'} />
         <span class="sweep" style={{ '--sweep': swingSweep }} />
         <span class="key">{keyLabel(side, 'attack')}</span>

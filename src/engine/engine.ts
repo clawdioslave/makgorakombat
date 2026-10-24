@@ -94,6 +94,8 @@ export interface Fighter {
   queued: boolean;
   /** The attack input last tick, so a tap can be told from a hold. */
   attackWas: boolean;
+  /** This press has already been told it is out of range. */
+  attackSaid: boolean;
   /** An ability pressed while the fighter could not act yet, kept for a few frames; -1 for none. */
   buffered: number;
   bufferedT: number;
@@ -287,6 +289,7 @@ function newFighter(side: 0 | 1, table: MoveTable): Fighter {
     auto: false,
     queued: false,
     attackWas: false,
+    attackSaid: false,
     buffered: -1,
     bufferedT: 0,
     gcd: 0,
@@ -606,7 +609,10 @@ function readKeys(f: Fighter, inputs: Inputs): void {
   const tap = inputs.attack && !f.attackWas;
   f.attackWas = inputs.attack;
   f.auto = inputs.attack;
-  if (tap) f.queued = true;
+  if (tap) {
+    f.queued = true;
+    f.attackSaid = false;
+  }
   const pressed = inputs.abilities.findIndex(Boolean);
   if (pressed >= 0) {
     f.buffered = pressed;
@@ -633,12 +639,19 @@ function applyInputs(match: Match, i: 0 | 1, inputs: Inputs): void {
     if (useAbility(match, i, n)) return;
   }
   // The auto-attack goes when its timer is up and the target is in reach.
-  if ((f.auto || f.queued) && f.swingT === 0 && inReach(f, o, table.weapon.range, false)) {
-    f.variation++;
-    play(f, 'attack', 'swing');
-    f.swingT = table.weapon.speed;
-    f.queued = false;
-    return;
+  if ((f.auto || f.queued) && f.swingT === 0) {
+    if (inReach(f, o, table.weapon.range, false)) {
+      f.variation++;
+      play(f, 'attack', 'swing');
+      f.swingT = table.weapon.speed;
+      f.queued = false;
+      return;
+    }
+    // A press that cannot reach says so, as the game does, the moment it is pressed.
+    if (f.queued && inputs.attack && !f.attackSaid) {
+      f.attackSaid = true;
+      text(match, i, 'info', 'OUT OF RANGE');
+    }
   }
   if (inputs.jump && !f.airborne) {
     play(f, 'jump', 'jumpStart');

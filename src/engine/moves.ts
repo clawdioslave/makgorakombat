@@ -98,7 +98,8 @@ const SPEED: Record<Wielding, number> = { unarmed: 2.0, oneHand: 2.0, twoHand: 3
 const DAMAGE: Record<Wielding, number> = { unarmed: 5, oneHand: 7, twoHand: 13, long: 13, bow: 9, rifle: 9, crossbow: 9, thrown: 6 };
 const RANGED: ReadonlySet<Wielding> = new Set(['bow', 'rifle', 'crossbow', 'thrown']);
 
-export const MELEE_RANGE = 2.0;
+/** A swing reaches this far: two bodies and a little; fighters that look to be touching can hit. */
+export const MELEE_RANGE = 2.6;
 export const SHOT_RANGE = 8.0;
 
 const ALL_READY = ['Ready1H', 'Ready2H', 'ReadyUnarmed', 'Ready2HL', 'ReadyBow', 'ReadyRifle', 'ReadyCrossbow', 'ReadyThrown'];

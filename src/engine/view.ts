@@ -49,7 +49,7 @@ export interface FighterView {
   hp: { current: number; max: number };
   resource: { kind: ResourceKind; name: string; colour: string; current: number; max: number };
   /** The auto-attack: on, and how far along the swing timer is. */
-  swing: { auto: boolean; remaining: number; total: number };
+  swing: { auto: boolean; remaining: number; total: number; /** The target can be hit from here. */ inReach: boolean };
   /** Frames of global cooldown left. */
   gcd: number;
   abilities: AbilityView[];
@@ -62,6 +62,14 @@ export interface FighterView {
 }
 
 const ACTIONS: readonly InputAction[] = ['ability1', 'ability2', 'ability3'];
+
+/** Whether the fighter's auto-attack would land from where it stands: facing the target, within the weapon's reach, on the same level. */
+function swingReach(match: Match, i: 0 | 1): boolean {
+  const f = match.fighters[i];
+  const o = match.fighters[i === 0 ? 1 : 0];
+  const ahead = f.facing * (o.x - f.x);
+  return Math.abs(o.z - f.z) < 1.2 && ahead > 0 && ahead <= match.tables[i].weapon.range;
+}
 
 /** A snapshot of fighter `i` for the UI. Cheap enough to take every frame. */
 export function fighterView(match: Match, i: 0 | 1): FighterView {
@@ -109,7 +117,7 @@ export function fighterView(match: Match, i: 0 | 1): FighterView {
     className: kit.className,
     hp: { current: f.hp, max: HP },
     resource: { kind: kit.resource, name: RESOURCE_NAMES[kit.resource], colour: RESOURCE_COLOURS[kit.resource], current: Math.floor(f.resource), max: MAX_RESOURCE },
-    swing: { auto: f.auto || f.queued, remaining: f.swingT, total: table.weapon.speed },
+    swing: { auto: f.auto || f.queued, remaining: f.swingT, total: table.weapon.speed, inReach: swingReach(match, i) },
     gcd: f.gcd,
     abilities,
     cast,

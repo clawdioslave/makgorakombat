@@ -491,7 +491,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 7.2em;
+  bottom: 7.8em;
   text-align: center;
   font-size: 1em;
   color: var(--gold);
@@ -520,8 +520,8 @@
 /* Slots take the pointer, so hovering one shows what it is and why it cannot go. */
 .fightbar .slot {
   position: relative;
-  width: 3.6em;
-  height: 3.6em;
+  width: 4.2em;
+  height: 4.2em;
   background: radial-gradient(circle at 50% 40%, #2a1e1a, #0b0808 80%);
   overflow: hidden;
   border-radius: 0.2em;
@@ -584,7 +584,7 @@
   display: grid;
   place-items: center;
   font-family: var(--heavy);
-  font-size: 1.35em;
+  font-size: 1.6em;
   color: var(--bone);
   text-shadow: 0 0 0.1em #000, 0.04em 0.04em 0 #000, -0.04em 0.04em 0 #000, 0.04em -0.04em 0 #000, -0.04em -0.04em 0 #000;
 }
@@ -593,7 +593,7 @@
   position: absolute;
   top: 0.15em;
   right: 0.25em;
-  font-size: 0.62em;
+  font-size: 0.7em;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: #fff;

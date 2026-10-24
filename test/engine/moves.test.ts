@@ -26,7 +26,7 @@ describe('resolveMoves', () => {
   });
 
   it('the weapon sets the swing timer, the damage and whether it shoots', () => {
-    expect(fakeTable(FULL_SET, 'oneHand').weapon).toMatchObject({ speed: 120, damage: 7, ranged: false, range: 2 });
+    expect(fakeTable(FULL_SET, 'oneHand').weapon).toMatchObject({ speed: 120, damage: 7, ranged: false, range: 2.6 });
     expect(fakeTable(FULL_SET, 'unarmed').weapon).toMatchObject({ speed: 120, damage: 5 });
     expect(fakeTable(FULL_SET, 'twoHand').weapon).toMatchObject({ speed: 204, damage: 13 });
     expect(fakeTable(FULL_SET, 'rifle').weapon).toMatchObject({ speed: 180, damage: 9, ranged: true, range: 8 });
