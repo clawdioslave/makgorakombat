@@ -219,10 +219,10 @@ function projectiles(ctx: CanvasRenderingContext2D, match: Match, at: (p: readon
       const p = at([shot.x - shot.vx * trail * 2, 0, shot.z]);
       if (!p) continue;
       const [sx, sy] = p;
-      const radius = 22 - trail * 3;
+      const radius = 30 - trail * 4;
       const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, radius);
-      glow.addColorStop(0, `rgba(255, 255, 220, ${trail === 0 ? 0.95 : 0.25})`);
-      glow.addColorStop(0.4, `rgba(120, 200, 255, ${trail === 0 ? 0.7 : 0.15})`);
+      glow.addColorStop(0, `rgba(255, 255, 230, ${trail === 0 ? 1 : 0.3})`);
+      glow.addColorStop(0.35, `rgba(140, 210, 255, ${trail === 0 ? 0.85 : 0.2})`);
       glow.addColorStop(1, 'rgba(60, 120, 255, 0)');
       ctx.fillStyle = glow;
       ctx.beginPath();

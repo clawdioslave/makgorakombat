@@ -96,7 +96,7 @@ function decide(match: Match, me: 0 | 1): Inputs {
 
   const caster = isCaster(match, me);
   const ready = usable();
-  if (ready.length > 0 && nextRandom(match) < 0.7) {
+  if (ready.length > 0 && nextRandom(match) < 0.5) {
     // Finish them when it is on the table; a gap-closer when far; otherwise anything that fits the moment.
     const execute = ready.find((n) => kit.abilities[n]!.execute);
     const charge = ready.find((n) => kit.abilities[n]!.kind === 'charge' || kit.abilities[n]!.kind === 'rush');
@@ -125,13 +125,19 @@ function decide(match: Match, me: 0 | 1): Inputs {
   }
 
   if (caster) {
-    // Keep the distance: back off from a melee opponent, come in when too far to reach them.
+    // A caster moves between casts: it backs off from a melee opponent at its elbow, comes in when too
+    // far to reach, and otherwise steps one way or the other half the time rather than standing to cast.
     if (table.weapon.ranged) out.attack = dist <= table.weapon.range;
-    if (dist < 2.4 && !cornered) {
-      if (nextRandom(match) < 0.8) backOff();
+    if (dist < 2.0 && !cornered) {
+      if (nextRandom(match) < 0.7) backOff();
       else out.attack = true;
     } else if (dist > 6.5) walkIn();
-    else if (dist < 2.4) out.attack = true;
+    else if (dist < 2.0) out.attack = true;
+    else {
+      const r = nextRandom(match);
+      if (r < 0.3) walkIn();
+      else if (r < 0.5 && !cornered) backOff();
+    }
     return out;
   }
 

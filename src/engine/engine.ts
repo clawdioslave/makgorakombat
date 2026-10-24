@@ -251,7 +251,10 @@ const LEAP_V = 0.16;
 const LEAP_VX = 0.12;
 const SLOW_FACTOR = 0.5;
 const BLOCK_FACTOR = 0.6;
-const CRIT_FACTOR = 2;
+/** A melee crit doubles; a spell crit is half again, as in the game. */
+const CRIT_FACTOR = { melee: 2, spell: 1.5 } as const;
+/** Swings and strikes play faster than the model's clip, so a blow reads as a blow. */
+const ATTACK_RATE = 1.35;
 /** Speed given to the target by a blow; it decays by 0.82 a frame, so the distance is about 5.5 times this. The game has none; a nudge sells the impact. */
 const PUSHBACK = { swing: 0.035, ability: 0.07, spell: 0.03, bolt: 0.05, charge: 0.2 } as const;
 
@@ -681,7 +684,8 @@ function advanceMove(match: Match, i: 0 | 1): void {
   const f = match.fighters[i];
   const move = moveOf(match, i, f.move);
   const duration = variationOf(move, f.variation).duration;
-  f.t += TICK_MS * match.slowmo;
+  const rate = f.state === 'attack' || f.state === 'ability' ? ATTACK_RATE : 1;
+  f.t += TICK_MS * match.slowmo * rate;
   if (f.t < duration) return;
   if (move.loop) {
     f.t = duration > 0 ? f.t % duration : 0;
@@ -957,7 +961,7 @@ function strike(match: Match, ai: 0 | 1, ti: 0 | 1, blow: Blow, dir: number, spa
   let amount = blow.damage;
   let kind: 'damage' | 'crit' | 'block' = 'damage';
   if (outcome === 'crit') {
-    amount = Math.round(amount * CRIT_FACTOR);
+    amount = Math.round(amount * (blow.roll === 'spell' ? CRIT_FACTOR.spell : CRIT_FACTOR.melee));
     kind = 'crit';
   } else if (outcome === 'block') {
     amount = Math.round(amount * BLOCK_FACTOR);

@@ -99,8 +99,8 @@ export const ABILITY_SLOTS = 3;
 export type SlotIndex = 0 | 1 | 2;
 
 export const MAX_RESOURCE = 100;
-/** The global cooldown: 1.5 s. */
-export const GCD_FRAMES = 90;
+/** The global cooldown: 1.0 s, a beat quicker than the game's 1.5 so a fight reads as a fight. */
+export const GCD_FRAMES = 60;
 /** A damage-over-time effect ticks every 3 s. */
 export const DOT_TICK_FRAMES = 180;
 /** Below this share of health Execute and Kill Shot work. */
@@ -161,7 +161,7 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
     3: {
       key: 'hunter', name: 'HUNTER', resource: 'focus',
       abilities: [
-        ability({ id: 'aimedShot', name: 'Aimed Shot', short: 'AIMED', kind: 'bolt', cost: 35, cast: 1.5 * S, damage: 22, anims: ['AttackBow', 'AttackRifle', 'AttackCrossbow', 'AttackThrown', ...SPELL], holdAnims: ['ReadyBow', 'ReadyRifle', 'ReadyCrossbow', ...CAST_HOLD] }),
+        ability({ id: 'aimedShot', name: 'Aimed Shot', short: 'AIMED', kind: 'bolt', cost: 35, cast: 1.5 * S, damage: 18, anims: ['AttackBow', 'AttackRifle', 'AttackCrossbow', 'AttackThrown', ...SPELL], holdAnims: ['ReadyBow', 'ReadyRifle', 'ReadyCrossbow', ...CAST_HOLD] }),
         ability({ id: 'disengage', name: 'Disengage', short: 'DISENGAGE', kind: 'leap', cooldown: 15 * S, gcd: false, anims: ['JumpStart', 'Jump', 'Dodge'] }),
         ability({ id: 'killShot', name: 'Kill Shot', short: 'KILL SHOT', kind: 'bolt', cost: 10, damage: 30, execute: true, anims: ['AttackBow', 'AttackRifle', 'AttackCrossbow', 'AttackThrown', ...SPELL] }),
       ],
@@ -177,7 +177,7 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
     5: {
       key: 'priest', name: 'PRIEST', resource: 'mana',
       abilities: [
-        ability({ id: 'mindBlast', name: 'Mind Blast', short: 'MIND BLAST', kind: 'spell', cost: 25, cooldown: 8 * S, cast: 1 * S, damage: 20, anims: ['PriSpellCastBothUp', ...SPELL], holdAnims: CAST_HOLD }),
+        ability({ id: 'mindBlast', name: 'Mind Blast', short: 'MIND BLAST', kind: 'spell', cost: 25, cooldown: 8 * S, cast: 1 * S, damage: 15, anims: ['PriSpellCastBothUp', ...SPELL], holdAnims: CAST_HOLD }),
         ability({ id: 'shadowWordPain', name: 'Shadow Word: Pain', short: 'SW: PAIN', kind: 'spell', cost: 20, dot: { damage: 5, ticks: 5 }, anims: SPELL }),
         ability({ id: 'powerWordShield', name: 'Power Word: Shield', short: 'PW: SHIELD', kind: 'self', cost: 25, cooldown: 10 * S, absorb: 25, anims: ['PriSpellCastBothUp', ...OMNI] }),
       ],
@@ -187,13 +187,13 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
       abilities: [
         ability({ id: 'icyTouch', name: 'Icy Touch', short: 'ICY TOUCH', kind: 'spell', cooldown: 6 * S, range: 4, damage: 10, slow: 3 * S, gain: 15, anims: SPELL }),
         ability({ id: 'deathStrike', name: 'Death Strike', short: 'DEATH STR', kind: 'melee', cooldown: 6 * S, damage: 16, heal: 10, gain: 15, anims: ['DeathStrike', ...STRIKE_2H] }),
-        ability({ id: 'deathCoil', name: 'Death Coil', short: 'DEATH COIL', kind: 'bolt', cost: 40, range: 6, damage: 18, anims: ['LocSpellCastBothFront', ...SPELL] }),
+        ability({ id: 'deathCoil', name: 'Death Coil', short: 'DEATH COIL', kind: 'bolt', cost: 40, range: 6, damage: 16, anims: ['LocSpellCastBothFront', ...SPELL] }),
       ],
     },
     7: {
       key: 'shaman', name: 'SHAMAN', resource: 'mana',
       abilities: [
-        ability({ id: 'lightningBolt', name: 'Lightning Bolt', short: 'LIGHTNING', kind: 'bolt', cost: 15, cast: 1.5 * S, damage: 16, anims: ['ShaSpellCastBothFront', ...SPELL], holdAnims: CAST_HOLD }),
+        ability({ id: 'lightningBolt', name: 'Lightning Bolt', short: 'LIGHTNING', kind: 'bolt', cost: 15, cast: 1.5 * S, damage: 14, anims: ['ShaSpellCastBothFront', ...SPELL], holdAnims: CAST_HOLD }),
         ability({ id: 'earthShock', name: 'Earth Shock', short: 'EARTH SHK', kind: 'spell', cost: 20, cooldown: 6 * S, range: 5, damage: 10, interrupt: true, anims: ['ShaSpellCastBothFront', ...SPELL] }),
         ability({ id: 'stormstrike', name: 'Stormstrike', short: 'STORMSTR', kind: 'melee', cost: 20, cooldown: 8 * S, damage: 16, anims: ['Stormstrike', ...strike] }),
       ],
@@ -201,15 +201,15 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
     8: {
       key: 'mage', name: 'MAGE', resource: 'mana',
       abilities: [
-        ability({ id: 'frostbolt', name: 'Frostbolt', short: 'FROSTBOLT', kind: 'bolt', cost: 20, cast: 1.5 * S, damage: 16, slow: 4 * S, anims: ['MagSpellCastBothFront', ...SPELL], holdAnims: CAST_HOLD }),
-        ability({ id: 'fireBlast', name: 'Fire Blast', short: 'FIRE BLAST', kind: 'spell', cost: 25, cooldown: 8 * S, range: 6, damage: 14, anims: ['MagSpellCastBothFront', ...SPELL] }),
+        ability({ id: 'frostbolt', name: 'Frostbolt', short: 'FROSTBOLT', kind: 'bolt', cost: 20, cast: 1.5 * S, damage: 14, slow: 4 * S, anims: ['MagSpellCastBothFront', ...SPELL], holdAnims: CAST_HOLD }),
+        ability({ id: 'fireBlast', name: 'Fire Blast', short: 'FIRE BLAST', kind: 'spell', cost: 25, cooldown: 8 * S, range: 6, damage: 12, anims: ['MagSpellCastBothFront', ...SPELL] }),
         ability({ id: 'blink', name: 'Blink', short: 'BLINK', kind: 'blink', cost: 15, cooldown: 15 * S, anims: OMNI }),
       ],
     },
     9: {
       key: 'warlock', name: 'WARLOCK', resource: 'mana',
       abilities: [
-        ability({ id: 'shadowBolt', name: 'Shadow Bolt', short: 'SHADOW BLT', kind: 'bolt', cost: 20, cast: 1.5 * S, damage: 18, anims: ['LocSpellCastBothFront', ...SPELL], holdAnims: CAST_HOLD }),
+        ability({ id: 'shadowBolt', name: 'Shadow Bolt', short: 'SHADOW BLT', kind: 'bolt', cost: 20, cast: 1.5 * S, damage: 15, anims: ['LocSpellCastBothFront', ...SPELL], holdAnims: CAST_HOLD }),
         ability({ id: 'corruption', name: 'Corruption', short: 'CORRUPTION', kind: 'spell', cost: 20, dot: { damage: 6, ticks: 5 }, anims: SPELL }),
         ability({ id: 'fear', name: 'Fear', short: 'FEAR', kind: 'spell', cost: 20, cooldown: 20 * S, cast: 1 * S, range: 6, fear: 150, anims: ['LocSpellCastBothFront', ...OMNI], holdAnims: CAST_HOLD }),
       ],
@@ -225,7 +225,7 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
     11: {
       key: 'druid', name: 'DRUID', resource: 'mana',
       abilities: [
-        ability({ id: 'wrath', name: 'Wrath', short: 'WRATH', kind: 'bolt', cost: 15, cast: 1.5 * S, damage: 14, anims: SPELL, holdAnims: ['DruReadySpellCast', ...CAST_HOLD] }),
+        ability({ id: 'wrath', name: 'Wrath', short: 'WRATH', kind: 'bolt', cost: 15, cast: 1.5 * S, damage: 12, anims: SPELL, holdAnims: ['DruReadySpellCast', ...CAST_HOLD] }),
         ability({ id: 'moonfire', name: 'Moonfire', short: 'MOONFIRE', kind: 'spell', cost: 20, damage: 8, dot: { damage: 4, ticks: 4 }, anims: OMNI }),
         ability({ id: 'rake', name: 'Rake', short: 'RAKE', kind: 'melee', cost: 25, damage: 8, dot: { damage: 4, ticks: 3 }, anims: ['SpecialUnarmed', 'AttackUnarmed', ...STRIKE_1H] }),
       ],
@@ -241,8 +241,8 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
     13: {
       key: 'evoker', name: 'EVOKER', resource: 'mana',
       abilities: [
-        ability({ id: 'livingFlame', name: 'Living Flame', short: 'LIVING FLM', kind: 'bolt', cost: 15, cast: 1.5 * S, damage: 16, anims: SPELL, holdAnims: CAST_HOLD }),
-        ability({ id: 'fireBreath', name: 'Fire Breath', short: 'FIRE BRTH', kind: 'spell', cost: 25, cooldown: 12 * S, range: 3.5, damage: 20, dot: { damage: 3, ticks: 3 }, anims: ['ChannelCastDirected', ...SPELL] }),
+        ability({ id: 'livingFlame', name: 'Living Flame', short: 'LIVING FLM', kind: 'bolt', cost: 15, cast: 1.5 * S, damage: 14, anims: SPELL, holdAnims: CAST_HOLD }),
+        ability({ id: 'fireBreath', name: 'Fire Breath', short: 'FIRE BRTH', kind: 'spell', cost: 25, cooldown: 12 * S, range: 3.5, damage: 16, dot: { damage: 3, ticks: 3 }, anims: ['ChannelCastDirected', ...SPELL] }),
         ability({ id: 'hover', name: 'Hover', short: 'HOVER', kind: 'leap', cooldown: 15 * S, gcd: false, anims: ['JumpStart', 'Jump', 'Dodge'] }),
       ],
     },

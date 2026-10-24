@@ -22,7 +22,7 @@ describe('describeAbility', () => {
       range: '8 yd range',
       cast: '1.5 sec cast',
       cooldown: '',
-      description: 'Hurls a bolt that deals 16 damage; it can be jumped over and slows the target for 4 sec.',
+      description: 'Hurls a bolt that deals 14 damage; it can be jumped over and slows the target for 4 sec.',
     });
   });
 

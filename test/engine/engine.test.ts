@@ -108,33 +108,33 @@ describe('movement', () => {
 });
 
 describe('the auto-attack', () => {
-  it('a one-hander swings every 2.0 s while the key is held', () => {
+  it('a one-hander swings every 1.5 s while the key is held', () => {
     const match = fighting(1.5);
     const held: [Inputs, Inputs] = [inputs({ attack: true }), inputs()];
     const starts: number[] = [];
     for (let f = 0; f < 400; f++) {
       tick(match, held);
       const p1 = match.fighters[0];
-      if (p1.state === 'attack' && p1.move === 'swing' && p1.t < 17) starts.push(f);
+      if (p1.state === 'attack' && p1.move === 'swing' && p1.t < 25) starts.push(f);
     }
-    expect(starts).toEqual([0, 120, 240, 360]);
-    expect(match.tables[0].weapon.speed).toBe(120);
+    expect(starts).toEqual([0, 90, 180, 270, 360]);
+    expect(match.tables[0].weapon.speed).toBe(90);
     expect(match.fighters[1].hp).toBeLessThan(HP);
   });
 
   it('a two-hander swings every 3.4 s and hits harder', () => {
     const table = fakeTable([...FULL_SET, 'Attack2H', 'Ready2H'], 'twoHand');
-    expect(table.weapon.speed).toBe(204);
-    expect(table.weapon.damage).toBe(13);
+    expect(table.weapon.speed).toBe(144);
+    expect(table.weapon.damage).toBe(14);
     expect(table.moves.swing.animation).toBe('Attack2H');
   });
 
   it('a tap queues one swing and no more', () => {
     const match = fighting(1.5);
     swing(match, 0, 'hit');
-    expect(match.fighters[1].hp).toBe(HP - 7);
+    expect(match.fighters[1].hp).toBe(HP - 8);
     run(match, 300);
-    expect(match.fighters[1].hp).toBe(HP - 7);
+    expect(match.fighters[1].hp).toBe(HP - 8);
     expect(match.fighters[0].queued).toBe(false);
   });
 
@@ -229,7 +229,7 @@ describe('the hit table', () => {
     press(match, 0, 2);
     expect(match.texts.find((t) => t.text === 'SHIELDED')).toMatchObject({ side: 0, from: 0 });
     swing(match, 1, 'hit');
-    expect(match.texts.find((t) => t.text === 'ABSORB 7')).toMatchObject({ side: 0, from: 1 });
+    expect(match.texts.find((t) => t.text === 'ABSORB 8')).toMatchObject({ side: 0, from: 1 });
   });
 
   it('a fear on a stunned target is IMMUNE', () => {
@@ -252,21 +252,21 @@ describe('the hit table', () => {
     tick(match, [inputs({ attack: true }), inputs()]);
     const landed = until(match, (m) => m.fighters[1].hp < HP, 60);
     expect(landed).toBeGreaterThan(0);
-    expect(match.fighters[1].hp).toBe(93);
+    expect(match.fighters[1].hp).toBe(92);
     expect(match.fighters[1].move).toBe('hit');
     expect(match.fighters[1].hitstop).toBeGreaterThan(0);
     expect(match.fighters[1].vx).toBeGreaterThan(0);
     expect(match.sparks[0]?.kind).toBe('hit');
-    expect(texts(match, 1)).toEqual(['damage:7']);
+    expect(texts(match, 1)).toEqual(['damage:8']);
     expect(match.fighters[1].tookDamage).toBe(true);
   });
 
   it('a crit doubles the damage with its own animation and a big yellow number', () => {
     const match = fighting(1.5);
     swing(match, 0, 'crit');
-    expect(match.fighters[1].hp).toBe(HP - 14);
+    expect(match.fighters[1].hp).toBe(HP - 16);
     expect(match.sparks.length === 0 || match.sparks[0]?.kind === 'crit').toBe(true);
-    expect(texts(match, 1)).toEqual(['crit:14']);
+    expect(texts(match, 1)).toEqual(['crit:16']);
   });
 
   it('a miss does nothing but say so', () => {
@@ -310,12 +310,12 @@ describe('the hit table', () => {
     const match = fighting(1.5, 1, [WARRIOR, WARRIOR], [false, true]);
     expect(match.tables[1].moves.parry.animation).toBe('ShieldBlock');
     swing(match, 0, 'block');
-    expect(match.fighters[1].hp).toBe(HP - 4);
-    expect(texts(match, 1)).toEqual(['block:BLOCK 4']);
+    expect(match.fighters[1].hp).toBe(HP - 5);
+    expect(texts(match, 1)).toEqual(['block:BLOCK 5']);
     const bare = fighting(1.5);
     swing(bare, 0, 'block');
     // Without a shield the same roll falls in the crit band.
-    expect(bare.fighters[1].hp).toBe(HP - 14);
+    expect(bare.fighters[1].hp).toBe(HP - 16);
   });
 
   it('a stunned target can neither dodge nor parry', () => {
@@ -379,7 +379,7 @@ describe('resources', () => {
 });
 
 describe('cooldowns', () => {
-  it('the global cooldown holds the next ability for 1.5 s', () => {
+  it('the global cooldown holds the next ability for 1.0 s', () => {
     const match = fighting(1.5, 1, [ROGUE, WARRIOR]);
     press(match, 0, 0, 'hit');
     expect(match.fighters[0].gcd).toBe(GCD_FRAMES);
@@ -390,7 +390,7 @@ describe('cooldowns', () => {
     run(match, GCD_FRAMES);
     expect(match.fighters[0].gcd).toBe(0);
     press(match, 0, 0, 'hit');
-    expect(match.fighters[0].t).toBeLessThan(20);
+    expect(match.fighters[0].t).toBeLessThan(25);
     expect(match.fighters[0].resource).toBeLessThan(energy);
   });
 
@@ -533,7 +533,7 @@ describe('abilities', () => {
     expect(match.fighters[0].resource).toBe(80);
     expect(until(match, (m) => m.projectiles.length > 0, 60)).toBeGreaterThan(0);
     expect(until(match, (m) => m.fighters[1].hp < HP, 120)).toBeGreaterThan(0);
-    expect(match.fighters[1].hp).toBe(HP - 16);
+    expect(match.fighters[1].hp).toBe(HP - 14);
     expect(match.fighters[1].slowT).toBeGreaterThan(0);
     expect(texts(match, 1)).toContain('status:SLOWED');
   });
@@ -591,8 +591,8 @@ describe('abilities', () => {
     expect(match.fighters[0].absorb).toBe(25);
     swing(match, 1, 'hit');
     expect(match.fighters[0].hp).toBe(HP);
-    expect(match.fighters[0].absorb).toBe(18);
-    expect(texts(match, 0)).toContain('absorb:ABSORB 7');
+    expect(match.fighters[0].absorb).toBe(17);
+    expect(texts(match, 0)).toContain('absorb:ABSORB 8');
     expect(match.fighters[0].tookDamage).toBe(false);
   });
 
@@ -812,7 +812,7 @@ describe('rounds', () => {
   it('the timer gives the round to the higher hp', () => {
     const match = fighting(1.5);
     swing(match, 0, 'hit');
-    expect(match.fighters[1].hp).toBe(93);
+    expect(match.fighters[1].hp).toBe(92);
     match.timer = 1;
     tick(match, NONE);
     expect(match.phase).toBe('ko');
@@ -831,7 +831,7 @@ describe('rounds', () => {
   it('a round where the winner was hit does not', () => {
     const match = fighting(1.5);
     swing(match, 1, 'hit');
-    expect(match.fighters[0].hp).toBe(93);
+    expect(match.fighters[0].hp).toBe(92);
     run(match, 60); // P1 recovers from the hit
     winRound(match);
     run(match, KO_SLOWMO.frames);

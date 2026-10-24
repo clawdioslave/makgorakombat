@@ -93,9 +93,9 @@ const PARRY: Record<Wielding, string[]> = {
   thrown: ['Parry1H'],
 };
 
-/** Seconds between swings, by weapon. */
-const SPEED: Record<Wielding, number> = { unarmed: 2.0, oneHand: 2.0, twoHand: 3.4, long: 3.4, bow: 3.0, rifle: 3.0, crossbow: 3.0, thrown: 2.0 };
-const DAMAGE: Record<Wielding, number> = { unarmed: 5, oneHand: 7, twoHand: 13, long: 13, bow: 9, rifle: 9, crossbow: 9, thrown: 6 };
+/** Seconds between swings, by weapon: the game's 2.0 / 3.4 / 3.0, three quarters of them, so the ring keeps moving. */
+const SPEED: Record<Wielding, number> = { unarmed: 1.5, oneHand: 1.5, twoHand: 2.4, long: 2.4, bow: 2.0, rifle: 2.0, crossbow: 2.0, thrown: 1.5 };
+const DAMAGE: Record<Wielding, number> = { unarmed: 7, oneHand: 8, twoHand: 14, long: 14, bow: 9, rifle: 9, crossbow: 9, thrown: 7 };
 const RANGED: ReadonlySet<Wielding> = new Set(['bow', 'rifle', 'crossbow', 'thrown']);
 
 /** A swing reaches this far: two bodies and a little; fighters that look to be touching can hit. */
