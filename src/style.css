@@ -191,6 +191,26 @@ code {
   font-size: 2.6rem;
 }
 
+/* The title is its own stacking context (it is fixed), so the logo's blend needs a backdrop in here. */
+.screen.title {
+  background: radial-gradient(ellipse at 50% 30%, #2b1416 0%, var(--bg) 60%, #000 100%);
+}
+
+.title .logo-art {
+  margin: 0 0 -8px;
+  width: min(620px, 72vw);
+  line-height: 0;
+}
+
+.title .logo-art img {
+  width: 100%;
+  height: auto;
+  /* The art sits on black: screened onto the page, the black goes and the glow stays. */
+  mix-blend-mode: screen;
+  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.9));
+  animation: slam 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
 .title .drop,
 .title .credits,
 .title .logo,

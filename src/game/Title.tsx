@@ -19,7 +19,7 @@ export function Logo({ small }: { small?: boolean }) {
 }
 
 /** The two champions the ring always opens on, drawn once from the game and shipped with the page. */
-const art = (name: string) => `${import.meta.env.BASE_URL}title/${name}.png`;
+const art = (name: string) => `${import.meta.env.BASE_URL}title/${name}` + (name === 'logo' ? '' : '.png');
 
 export function Title({ phase, dragging, onPick }: TitleProps) {
   return (
@@ -28,7 +28,9 @@ export function Title({ phase, dragging, onPick }: TitleProps) {
         <img class="champion left" src={art('tyrande')} alt="" draggable={false} />
         <img class="champion right" src={art('thrall')} alt="" draggable={false} />
       </div>
-      <Logo />
+      <h1 class="logo-art">
+        <img src={art('logo') + '.webp'} alt={BRAND.title} draggable={false} />
+      </h1>
       <p class="tagline">{BRAND.tagline}</p>
       <div class="billing">
         <span class="p1">TYRANDE</span>
