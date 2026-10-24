@@ -70,7 +70,9 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
       sounds: () => ({ played: mixer.played, sides: mixer.summary() }),
     };
     const input = new InputReader();
-    input.attach(stageElement.current!);
+    // The keys are read from the window, not the stage element: a click on the DOM frames or anywhere
+    // else must not leave the keyboard dead. The stage still takes focus so the arrows do not scroll.
+    input.attach(window);
     input.setSource(1, p2);
     stageElement.current!.focus();
 

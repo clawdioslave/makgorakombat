@@ -79,16 +79,19 @@ describe('movement', () => {
     expect(match.fighters[1].x).toBeCloseTo(-HALF + BODY, 5);
   });
 
-  it('walks forward and backs away at different speeds', () => {
+  it('runs forward and backpedals at different speeds', () => {
     const match = fighting(4.4);
     const x0 = match.fighters[0].x;
     tick(match, [inputs({ right: true }), inputs()]);
     const forward = match.fighters[0].x - x0;
+    expect(match.fighters[0].move).toBe('walk');
+    expect(match.tables[0].moves.walk.animation).toBe('Run');
     tick(match, [inputs({ left: true }), inputs()]);
     const back = match.fighters[0].x - x0 - forward;
-    expect(forward).toBeCloseTo(0.045, 6);
-    expect(back).toBeCloseTo(-0.035, 6);
+    expect(forward).toBeCloseTo(0.07, 6);
+    expect(back).toBeCloseTo(-0.045, 6);
     expect(match.fighters[0].move).toBe('back');
+    expect(match.tables[0].moves.back.animation).toBe('Walkbackwards');
   });
 
   it('jumps and lands back on the ground', () => {

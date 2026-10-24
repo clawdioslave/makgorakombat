@@ -113,7 +113,8 @@ function candidates(wielding: Wielding, shield: boolean): Record<MoveName, { nam
   const uniq = (first: string[], rest: string[]) => [...new Set([...first, ...rest])];
   return {
     idle: { names: uniq(READY[wielding], ['Stand']), loop: true },
-    walk: { names: ['Walk', 'Run'], loop: true },
+    // Fighters run at each other and backpedal away, as players do.
+    walk: { names: ['Run', 'Walk'], loop: true },
     back: { names: ['Walkbackwards', 'RunBackwards', 'Walk'], loop: true },
     jumpStart: { names: ['JumpStart'], loop: false },
     jump: { names: ['Jump'], loop: true },

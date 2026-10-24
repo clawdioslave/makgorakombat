@@ -5,7 +5,7 @@ import { INTRO_FRAMES } from '../../src/engine/stage';
 
 /** A retail-like animation list, every sequence 1000 ms unless overridden by name. */
 export const FULL_SET = [
-  'Stand', 'Ready1H', 'Walk', 'Walkbackwards', 'JumpStart', 'Jump', 'JumpEnd',
+  'Stand', 'Ready1H', 'Walk', 'Run', 'Walkbackwards', 'JumpStart', 'Jump', 'JumpEnd',
   'Attack1H', 'Attack1H', 'Attack1H', 'AttackUnarmed', 'Special1H', 'SpellCastDirected', 'ReadySpellDirected',
   'ShieldBlock', 'Parry1H', 'Dodge', 'CombatWound', 'CombatCritical', 'Knockdown', 'Stun', 'Death',
   'CombatExecute', 'CombatAbility1H01', 'CombatAbility2HBig01', 'CombatWhirlwind', 'CombatChargeLoop', 'CombatChargeEnd',

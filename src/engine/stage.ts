@@ -9,9 +9,9 @@ export const HALF = 5;
 export const START_X = 2.2;
 /** Minimum distance between two bodies; the physics step pushes them apart below it. */
 export const BODY = 0.9;
-/** Ground speed per frame, forwards and backwards. */
-export const WALK = 0.045;
-export const BACK = 0.035;
+/** Ground speed per frame: a run forwards (4.2 yards a second), a backpedal away. */
+export const WALK = 0.07;
+export const BACK = 0.045;
 /** Jump: initial vertical speed and the gravity taken off it every frame. */
 export const JUMP_V = 0.19;
 export const GRAVITY = 0.0085;
