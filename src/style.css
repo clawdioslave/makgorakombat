@@ -191,8 +191,9 @@ code {
   font-size: 2.6rem;
 }
 
-/* The title is its own stacking context (it is fixed), so the logo's blend needs a backdrop in here. */
-.screen.title {
+/* A screen is its own stacking context (it is fixed), so the logo's blend needs a backdrop in it. */
+.screen.title,
+.screen.select {
   background: radial-gradient(ellipse at 50% 30%, #2b1416 0%, var(--bg) 60%, #000 100%);
 }
 

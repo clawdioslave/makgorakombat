@@ -335,7 +335,9 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
         {player.error && <div class="status bad">{player.error}</div>}
         {player.locked && <div class="stamp">{BRAND.chosen}</div>}
         {player.built && player.built.result.scene.problems.length > 0 && (
-          <div class="status dim small">{player.built.result.scene.problems.length} piece(s) could not be read</div>
+          <div class="status dim small" title={player.built.result.scene.problems.join('\n')}>
+            {player.built.result.scene.problems.length} piece(s) not in this install: {player.built.result.scene.problems[0]}
+          </div>
         )}
       </div>
     );
