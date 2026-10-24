@@ -538,6 +538,27 @@ describe('abilities', () => {
     expect(texts(match, 1)).toContain('status:SLOWED');
   });
 
+  it('a bolt tells the visuals when it leaves the hand and where it lands', () => {
+    const match = fighting(4, 1, [MAGE, WARRIOR]);
+    press(match, 0, 0); // Frostbolt
+    expect(match.spellEvents).toEqual([]);
+    rig(match, 'hit');
+    expect(until(match, (m) => m.projectiles.length > 0, 200)).toBeGreaterThan(0);
+    expect(match.spellEvents.map((e) => `${e.owner}:${e.spell}:${e.kind}`)).toEqual(['0:frostbolt:release']);
+    expect(until(match, (m) => m.fighters[1].hp < HP, 120)).toBeGreaterThan(0);
+    const impact = match.spellEvents.find((e) => e.kind === 'impact');
+    expect(impact).toMatchObject({ owner: 0, spell: 'frostbolt' });
+    expect(Math.abs(impact!.x - match.fighters[1].x)).toBeLessThan(1);
+    run(match, 90);
+    expect(match.spellEvents).toEqual([]);
+  });
+
+  it('a damage-over-time spell lands as an impact though it deals nothing yet', () => {
+    const match = fighting(4, 1, [PRIEST, WARRIOR]);
+    press(match, 0, 1, 'hit'); // Shadow Word: Pain
+    expect(match.spellEvents.map((e) => `${e.spell}:${e.kind}`)).toEqual(['shadowWordPain:release', 'shadowWordPain:impact']);
+  });
+
   it('damage interrupts a cast', () => {
     const match = fighting(1.5, 1, [MAGE, WARRIOR]);
     press(match, 0, 0);

@@ -146,6 +146,23 @@ export interface Spark {
   life: number;
 }
 
+/**
+ * A moment of a spell for the visuals to draw: when an ability left its caster (an instant's use,
+ * a cast's completion, a bolt's launch, a dash's start) and where a blow from one landed. Nothing
+ * in the fight reads these; they age out after SPELL_EVENT_LIFE frames.
+ */
+export interface SpellEvent {
+  /** The ability's id ('lightningBolt'), or 'shot' for a ranged auto-attack. */
+  spell: string;
+  owner: 0 | 1;
+  kind: 'release' | 'impact';
+  /** The caster's place for a release; where the blow landed for an impact. */
+  x: number;
+  z: number;
+  /** Frames since it happened. */
+  t: number;
+}
+
 export type TextKind = 'damage' | 'crit' | 'dot' | 'heal' | 'absorb' | 'miss' | 'dodge' | 'parry' | 'block' | 'immune' | 'status' | 'info';
 
 /** Floating combat text: a number or a word that rises over a fighter. */
@@ -228,6 +245,7 @@ export interface Match {
   projectiles: Projectile[];
   sparks: Spark[];
   texts: FloatingText[];
+  spellEvents: SpellEvent[];
   /** 1-based. */
   round: number;
   phase: Phase;
@@ -259,6 +277,8 @@ export const NO_INPUTS: Readonly<Inputs> = Object.freeze(noInputs());
 
 const BANNER_LIFE = 90;
 const SPARK_LIFE = 14;
+/** A spell event is kept 1.5 s, long enough for the longest impact to play. */
+export const SPELL_EVENT_LIFE = 90;
 /** Floating text lives 1.2 s. */
 const TEXT_LIFE = 72;
 const INFO_LIFE = 45;
@@ -374,6 +394,7 @@ export function newMatch(tables: [MoveTable, MoveTable], seed: number, names: [s
     projectiles: [],
     sparks: [],
     texts: [],
+    spellEvents: [],
     round: 1,
     phase: 'intro',
     phaseT: 0,
@@ -481,6 +502,10 @@ function spark(match: Match, x: number, z: number, kind: SparkKind): void {
   match.sparks.push({ x, z, kind, t: 0, life: SPARK_LIFE });
 }
 
+function spellEvent(match: Match, owner: 0 | 1, spell: string, kind: SpellEvent['kind'], x: number, z: number): void {
+  match.spellEvents.push({ spell, owner, kind, x, z, t: 0 });
+}
+
 function cancelCast(f: Fighter): void {
   if (!f.cast) return;
   f.cast = undefined;
@@ -552,6 +577,7 @@ function fire(match: Match, i: 0 | 1, n: number): void {
   const ti = other(i);
   const o = match.fighters[ti];
   const a = abilityOf(match, i, n);
+  spellEvent(match, i, a.id, 'release', f.x, f.z);
   switch (a.kind) {
     case 'spell':
       if (Math.abs(o.x - f.x) > a.range + REACH_SLACK) return;
@@ -568,6 +594,7 @@ function fire(match: Match, i: 0 | 1, n: number): void {
 function launch(match: Match, i: 0 | 1, ability: number, damage: number): void {
   const f = match.fighters[i];
   const shot = ability < 0;
+  spellEvent(match, i, shot ? 'shot' : abilityOf(match, i, ability).id, 'release', f.x, f.z);
   match.projectiles.push({
     x: f.x + f.facing * 0.8,
     z: PROJECTILE_Z,
@@ -604,6 +631,7 @@ export function useAbility(match: Match, i: 0 | 1, n: number): boolean {
   const ref: MoveRef = `ability${n as SlotIndex}`;
   switch (a.kind) {
     case 'melee':
+      spellEvent(match, i, a.id, 'release', f.x, f.z);
       play(f, 'ability', ref);
       return true;
     case 'bolt':
@@ -617,10 +645,12 @@ export function useAbility(match: Match, i: 0 | 1, n: number): boolean {
       return true;
     case 'charge':
     case 'rush':
+      spellEvent(match, i, a.id, 'release', f.x, f.z);
       f.dash = { ability: n, t: 0, fromX: f.x };
       play(f, 'dash', `cast${n as SlotIndex}`);
       return true;
     case 'blink': {
+      spellEvent(match, i, a.id, 'release', f.x, f.z);
       const away = o.x >= f.x ? -1 : 1;
       f.x = Math.min(HALF, Math.max(-HALF, f.x + away * BLINK_DISTANCE));
       f.vx = 0;
@@ -630,6 +660,7 @@ export function useAbility(match: Match, i: 0 | 1, n: number): boolean {
       return true;
     }
     case 'leap': {
+      spellEvent(match, i, a.id, 'release', f.x, f.z);
       const away = o.x >= f.x ? -1 : 1;
       f.airborne = true;
       f.vz = LEAP_V;
@@ -1000,6 +1031,8 @@ function strike(match: Match, ai: 0 | 1, ti: 0 | 1, blow: Blow, dir: number, spa
     default:
       break;
   }
+  // It landed: a spell or a shot shows where, damage or none (a damage-over-time spell starts at 0).
+  if (a || blow.roll === 'ranged') spellEvent(match, ai, a ? a.id : 'shot', 'impact', sparkX, sparkZ);
 
   let amount = blow.damage;
   let kind: 'damage' | 'crit' | 'block' = 'damage';
@@ -1563,6 +1596,11 @@ export function tick(match: Match, inputs: [Inputs, Inputs]): void {
     const s = match.texts[k]!;
     s.t++;
     if (s.t >= s.life) match.texts.splice(k, 1);
+  }
+  for (let k = match.spellEvents.length - 1; k >= 0; k--) {
+    const e = match.spellEvents[k]!;
+    e.t++;
+    if (e.t >= SPELL_EVENT_LIFE) match.spellEvents.splice(k, 1);
   }
   for (const f of match.fighters) {
     f.shownHp += (f.hp - f.shownHp) * HP_EASE;
