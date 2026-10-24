@@ -1,0 +1,134 @@
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { BRAND } from '../../engine/brand';
+import type { Match } from '../../engine/engine';
+import { keyLabel } from '../../engine/input';
+import { ROUNDS_TO_WIN } from '../../engine/stage';
+import { type FighterView, fighterView } from '../../engine/view';
+import type { BuiltFighter } from '../fighters';
+import type { Source } from '../Select';
+import { FightBar } from './FightBar';
+import { Icons, type UiAssets } from './icons';
+import { UnitFrame } from './UnitFrame';
+import './ui.css';
+
+/*
+ * The game's interface over the fight, in the DOM: a unit frame for each champion at the top
+ * with the clock between them, an action bar for each player along the bottom. It reads the
+ * live match once a frame through `window.mk.match()`, which the fight screen exposes, so the
+ * fight itself need not know it is there.
+ */
+
+export interface FightUiProps {
+  fighters: [BuiltFighter, BuiltFighter];
+  p2: Source;
+  assets: UiAssets;
+}
+
+interface Frame {
+  views: [FighterView, FighterView];
+  seconds: number;
+  round: number;
+  phase: Match['phase'];
+  ranged: [boolean, boolean];
+}
+
+/** Status effects whose icons are wanted before they appear. */
+const EFFECT_NAMES = ['Stunned', 'Feared', 'Slowed', 'Shield', 'Evasion', 'Riposte', 'Interrupted'];
+
+const liveMatch = (): Match | undefined => (window as unknown as { mk?: { match?: () => Match } }).mk?.match?.();
+
+export function FightUi({ fighters, p2, assets }: FightUiProps) {
+  const icons = useMemo(() => new Icons(assets), [assets]);
+  const [frame, setFrame] = useState<Frame>();
+  const [abilityIcons, setAbilityIcons] = useState<[Map<string, string>, Map<string, string>]>([new Map(), new Map()]);
+  const [spellIcons, setSpellIcons] = useState<Map<string, string>>(new Map());
+  const loaded = useRef(false);
+
+  // Once a frame: a snapshot of each fighter.
+  useEffect(() => {
+    let handle = 0;
+    const loop = () => {
+      handle = requestAnimationFrame(loop);
+      const match = liveMatch();
+      if (!match) return;
+      setFrame({
+        views: [fighterView(match, 0), fighterView(match, 1)],
+        seconds: Math.max(0, Math.ceil(match.timer / 60)),
+        round: match.round,
+        phase: match.phase,
+        ranged: [match.tables[0].weapon.ranged, match.tables[1].weapon.ranged],
+      });
+      if (!loaded.current) {
+        loaded.current = true;
+        void loadIcons(match);
+      }
+    };
+    handle = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [icons]);
+
+  /** Every picture the two kits can show, fetched together; the bar fills in as they arrive. */
+  const loadIcons = async (match: Match) => {
+    const byName = new Map<string, string>();
+    const names = new Set<string>(EFFECT_NAMES);
+    for (const table of match.tables) for (const ability of table.kit.abilities) names.add(ability.name);
+    await Promise.all(
+      [...names].map(async (name) => {
+        const url = await icons.spell(name);
+        if (url) byName.set(name, url);
+      }),
+    );
+    setSpellIcons(new Map(byName));
+    const sides = await Promise.all(
+      ([0, 1] as const).map(async (i) => {
+        const table = match.tables[i];
+        const map = new Map<string, string>();
+        for (const ability of table.kit.abilities) {
+          const url = byName.get(ability.name) ?? icons.classIcon(table.kit.classKey);
+          if (url) map.set(ability.id, url);
+        }
+        const mainHand = fighters[i].champion.gear.find(([slot]) => slot === 'mainHand')?.[1];
+        const weapon = (await icons.item(mainHand)) ?? (await icons.spell(table.weapon.ranged ? 'Shoot' : 'Attack'));
+        if (weapon) map.set('attack', weapon);
+        return map;
+      }),
+    );
+    setAbilityIcons([sides[0]!, sides[1]!]);
+  };
+
+  const portraits = useMemo(() => [icons.portrait(fighters[0].champion), icons.portrait(fighters[1].champion)] as const, [icons, fighters]);
+
+  if (!frame) return <div class="wowui" />;
+  const human: [boolean, boolean] = [true, p2 !== 'cpu'];
+  return (
+    <div class="wowui">
+      <div class="top">
+        <UnitFrame side={0} view={frame.views[0]} portrait={portraits[0]} effectIcons={spellIcons} spellIcons={spellIcons} roundsToWin={ROUNDS_TO_WIN} />
+        <div class="clock-plate">
+          <div class={`clock ${frame.seconds <= 10 ? 'late' : ''}`}>{frame.seconds}</div>
+          <div class="round">{BRAND.round(frame.round)}</div>
+        </div>
+        <UnitFrame side={1} view={frame.views[1]} portrait={portraits[1]} effectIcons={spellIcons} spellIcons={spellIcons} roundsToWin={ROUNDS_TO_WIN} />
+      </div>
+      <div class="bottom">
+        {([0, 1] as const).map((i) => (
+          <div class={`bar-stack p${i + 1}`} key={i}>
+            <FightBar side={i} view={frame.views[i]} icons={abilityIcons[i]} ranged={frame.ranged[i]} />
+            {frame.phase === 'intro' && frame.round === 1 && (
+              <div class="hint">
+                {human[i] ? (
+                  <>
+                    <b>{keyLabel(i, 'left')}</b> <b>{keyLabel(i, 'right')}</b> move · <b>{keyLabel(i, 'jump')}</b> jump · <b>{keyLabel(i, 'attack')}</b> attack
+                  </>
+                ) : (
+                  'COMPUTER'
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

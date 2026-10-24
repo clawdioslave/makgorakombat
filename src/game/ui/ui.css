@@ -1,0 +1,608 @@
+/*
+ * The game's interface over the fight. Everything is in em so it scales with the window: one
+ * unit is a hundredth of the 16:9 box that fits the window, and 1em is 1.25 units, 16px at
+ * 1280 × 720. The frames are built from gradients and inset shadows in the shape of the
+ * default UI's stone and gold bevels.
+ */
+
+.wowui {
+  --u: min(1vw, 1.7778vh);
+  --bone: #f4f1e6;
+  --gold: #ffd100;
+  --gold-dim: #c9a227;
+  --stone: #2a2522;
+  --stone-dark: #15110f;
+  --stone-light: #4a423b;
+  --health: #1fd41f;
+  --health-dark: #0a7a0a;
+  --serif: 'Cinzel', Palatino, 'Palatino Linotype', Georgia, serif;
+  --heavy: 'Metal Mania', Impact, 'Arial Black', sans-serif;
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  font-family: var(--serif);
+  font-size: calc(var(--u) * 1.25);
+  color: var(--bone);
+  user-select: none;
+}
+
+.wowui img {
+  display: block;
+}
+
+/* ---- the top: two unit frames and the clock ----------------------------------------------- */
+
+.wowui .top {
+  position: absolute;
+  top: 1em;
+  left: 1.25em;
+  right: 1.25em;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.wowui .clock-plate {
+  text-align: center;
+  padding-top: 0.2em;
+}
+
+.wowui .clock {
+  font-family: var(--heavy);
+  font-size: 3.2em;
+  line-height: 1;
+  color: var(--bone);
+  text-shadow:
+    0 0 0.08em #1a0606,
+    0.04em 0.04em 0 #1a0606,
+    -0.04em 0.04em 0 #1a0606,
+    0.04em -0.04em 0 #1a0606,
+    -0.04em -0.04em 0 #1a0606,
+    0 0.1em 0.3em rgba(0, 0, 0, 0.8);
+}
+
+.wowui .clock.late {
+  color: #ff5a2a;
+}
+
+.wowui .round {
+  margin-top: 0.1em;
+  font-size: 0.8em;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+  text-shadow: 0 1px 2px #000, 0 0 0.4em rgba(0, 0, 0, 0.9);
+}
+
+/* ---- the unit frame ---------------------------------------------------------------------- */
+
+.unitframe {
+  width: 23em;
+  filter: drop-shadow(0 0.2em 0.4em rgba(0, 0, 0, 0.7));
+}
+
+.unitframe.dead {
+  filter: grayscale(1) brightness(0.6) drop-shadow(0 0.2em 0.4em rgba(0, 0, 0, 0.7));
+}
+
+.unitframe .plate {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.45em 0.6em 0.45em 0.45em;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.35)),
+    linear-gradient(90deg, #332b26, var(--stone) 40%, #221c19);
+  border: 2px solid #0a0706;
+  border-radius: 3.4em 0.6em 0.6em 3.4em;
+  box-shadow:
+    inset 0 0 0 1px var(--stone-light),
+    inset 0 0 0 2px #0a0706,
+    inset 0 0 0 3px #6b5a2a,
+    inset 0 2px 0 3px rgba(255, 230, 160, 0.15);
+}
+
+.unitframe.p2 .plate {
+  flex-direction: row-reverse;
+  padding: 0.45em 0.45em 0.45em 0.6em;
+  border-radius: 0.6em 3.4em 3.4em 0.6em;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.35)),
+    linear-gradient(270deg, #332b26, var(--stone) 40%, #221c19);
+}
+
+.unitframe .portrait {
+  position: relative;
+  flex: none;
+  width: 5.6em;
+  height: 5.6em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #3a2a24, #0b0808 75%);
+  box-shadow:
+    inset 0 0 0 2px #0a0706,
+    0 0 0 2px #0a0706,
+    0 0 0 4px #7a6830,
+    0 0 0 5px #0a0706,
+    inset 0 0 1.2em rgba(0, 0, 0, 0.9);
+  overflow: visible;
+}
+
+.unitframe .portrait img,
+.unitframe .portrait .letter {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  font-family: var(--heavy);
+  font-size: 2.6em;
+  color: var(--gold);
+}
+
+.unitframe .portrait img {
+  box-shadow: inset 0 0 0.8em rgba(0, 0, 0, 0.9);
+}
+
+.unitframe .pips {
+  position: absolute;
+  bottom: -0.35em;
+  right: -0.35em;
+  display: flex;
+  gap: 0.15em;
+}
+
+.unitframe.p2 .pips {
+  right: auto;
+  left: -0.35em;
+}
+
+.unitframe .pip {
+  width: 1.3em;
+  height: 1.3em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #2a2420, #0b0808 80%);
+  box-shadow:
+    0 0 0 2px #0a0706,
+    0 0 0 3px #7a6830,
+    0 0.1em 0.3em rgba(0, 0, 0, 0.8);
+}
+
+.unitframe .pip.won {
+  background: radial-gradient(circle at 50% 35%, #fff2a0, var(--gold) 45%, #b8860b 90%);
+  box-shadow:
+    0 0 0 2px #0a0706,
+    0 0 0 3px #b8860b,
+    0 0 0.6em rgba(255, 209, 0, 0.6);
+}
+
+.unitframe .bars {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+}
+
+.unitframe .name {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5em;
+  padding: 0.1em 0.4em 0.15em;
+  background: linear-gradient(180deg, #0f0b0a, #1b1512);
+  border: 1px solid #0a0706;
+  box-shadow: inset 0 0 0 1px #3d3328;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.unitframe.p2 .name {
+  flex-direction: row-reverse;
+}
+
+.unitframe .name .who {
+  font-weight: 700;
+  font-size: 1em;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  text-shadow: 0 1px 1px #000;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.unitframe .name .class {
+  font-size: 0.6em;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #b5a79a;
+  flex: none;
+}
+
+.unitframe .bar {
+  position: relative;
+  height: 1.45em;
+  background: linear-gradient(180deg, #0c0a09, #1a1412);
+  border: 1px solid #0a0706;
+  box-shadow: inset 0 0 0 1px #2e2721, inset 0 0.25em 0.4em rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+}
+
+.unitframe .bar.power {
+  height: 1.1em;
+}
+
+.unitframe .bar .fill {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: 1px;
+  width: calc((100% - 2px) * var(--fill));
+  background: linear-gradient(180deg, #7dff7d, var(--health) 45%, var(--health-dark));
+  transition: width 0.08s linear;
+}
+
+.unitframe.p2 .bar .fill {
+  left: auto;
+  right: 1px;
+}
+
+.unitframe .bar.power .fill {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--power) 55%, white), var(--power) 45%, color-mix(in srgb, var(--power) 60%, black));
+}
+
+.unitframe .bar .gloss {
+  position: absolute;
+  inset: 1px 1px 50% 1px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.04));
+  pointer-events: none;
+}
+
+.unitframe .bar .text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #fff;
+  text-shadow: 0 1px 0 #000, 0 0 3px #000, 1px 0 0 #000, -1px 0 0 #000;
+}
+
+.unitframe .bar.power .text {
+  font-size: 0.62em;
+}
+
+/* ---- buffs and debuffs ------------------------------------------------------------------- */
+
+.unitframe .effects {
+  display: flex;
+  gap: 0.3em;
+  min-height: 2.5em;
+  margin: 0.4em 0 0 6.9em;
+}
+
+.unitframe.p2 .effects {
+  flex-direction: row-reverse;
+  margin: 0.4em 6.9em 0 0;
+}
+
+.effect {
+  position: relative;
+  width: 1.9em;
+  height: 1.9em;
+  background: #0b0808;
+  box-shadow: 0 0 0 1px #0a0706, 0 0 0 2px #3d3328;
+  margin-bottom: 0.8em;
+}
+
+.effect.debuff {
+  box-shadow: 0 0 0 1px #0a0706, 0 0 0 2px #c41f3b;
+}
+
+.effect.shield,
+.effect.evasion,
+.effect.riposte {
+  box-shadow: 0 0 0 1px #0a0706, 0 0 0 2px #6b5a2a;
+}
+
+.effect img,
+.effect .letter {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  font-size: 0.9em;
+  font-weight: 700;
+  color: var(--bone);
+}
+
+.effect .swipe {
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(rgba(0, 0, 0, 0.7) calc(var(--sweep) * 360deg), transparent 0);
+}
+
+.effect .stack {
+  position: absolute;
+  right: 0.05em;
+  bottom: 0;
+  font-size: 0.65em;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 2px #000, 0 1px 0 #000;
+}
+
+.effect .time {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  text-align: center;
+  font-size: 0.6em;
+  font-weight: 700;
+  color: var(--bone);
+  text-shadow: 0 1px 1px #000, 0 0 2px #000;
+}
+
+/* ---- the cast bar ------------------------------------------------------------------------ */
+
+.unitframe .castbar {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  margin: 0.2em 0 0 6.9em;
+  width: 15em;
+}
+
+.unitframe.p2 .castbar {
+  flex-direction: row-reverse;
+  margin: 0.2em 6.9em 0 auto;
+}
+
+.castbar .icon {
+  flex: none;
+  width: 1.7em;
+  height: 1.7em;
+  background: #0b0808;
+  box-shadow: 0 0 0 1px #0a0706, 0 0 0 2px #6b5a2a;
+}
+
+.castbar .icon img {
+  width: 100%;
+  height: 100%;
+}
+
+.castbar .track {
+  position: relative;
+  flex: 1;
+  height: 1.25em;
+  background: linear-gradient(180deg, #0c0a09, #1a1412);
+  border: 1px solid #0a0706;
+  box-shadow: inset 0 0 0 1px #6b5a2a, 0 0 0.4em rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+}
+
+.castbar .track .fill {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: 1px;
+  width: calc((100% - 2px) * var(--fill));
+  background: linear-gradient(180deg, #ffe680, #ffc21f 50%, #d98f00);
+}
+
+.castbar .track .spark {
+  position: absolute;
+  top: -40%;
+  bottom: -40%;
+  left: calc(1px + (100% - 2px) * var(--fill) - 0.4em);
+  width: 0.8em;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.9), rgba(255, 240, 180, 0) 70%);
+}
+
+.castbar .track .text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 0 1px 0 #000, 0 0 3px #000;
+}
+
+.castbar .track .left {
+  position: absolute;
+  right: 0.4em;
+  top: 0;
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.65em;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 0 #000, 0 0 3px #000;
+}
+
+/* ---- the bottom: an action bar for each player ------------------------------------------- */
+
+.wowui .bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1.1em;
+  display: flex;
+  justify-content: center;
+  gap: 4em;
+}
+
+.wowui .bar-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4em;
+}
+
+.wowui .hint {
+  font-size: 0.7em;
+  letter-spacing: 0.06em;
+  color: rgba(244, 241, 230, 0.85);
+  text-shadow: 0 1px 2px #000, 0 0 0.4em #000;
+}
+
+.wowui .hint b {
+  color: var(--gold);
+}
+
+.fightbar {
+  display: flex;
+  gap: 0.3em;
+  padding: 0.35em;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.4)),
+    linear-gradient(90deg, #221c19, var(--stone) 50%, #221c19);
+  border: 2px solid #0a0706;
+  border-radius: 0.35em;
+  box-shadow:
+    inset 0 0 0 1px var(--stone-light),
+    inset 0 0 0 2px #0a0706,
+    inset 0 0 0 3px #5a4a24,
+    0 0.3em 0.9em rgba(0, 0, 0, 0.8);
+}
+
+.fightbar .slot {
+  position: relative;
+  width: 3.6em;
+  height: 3.6em;
+  background: radial-gradient(circle at 50% 40%, #2a1e1a, #0b0808 80%);
+  overflow: hidden;
+  border-radius: 0.2em;
+}
+
+.fightbar .slot .icon {
+  position: absolute;
+  inset: 0.18em;
+  width: auto;
+  height: auto;
+  border-radius: 0.15em;
+  object-fit: cover;
+  transition: filter 0.1s;
+}
+
+.fightbar .slot .icon.text {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 0.55em;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+  padding: 0.3em;
+  color: #c9b27a;
+}
+
+/* The bevelled border over the icon, as the game's slot texture frames it. */
+.fightbar .slot .rim {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.2em;
+  box-shadow:
+    inset 0 0 0 1px #0a0706,
+    inset 0 0 0 2px #4a3f2a,
+    inset 0 0 0 3px #0a0706,
+    inset 0 0.5em 0.6em rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  transition: box-shadow 0.08s;
+}
+
+/* The cooldown: the dark part shrinks clockwise as time passes. */
+.fightbar .slot .sweep {
+  position: absolute;
+  inset: 0.18em;
+  border-radius: 0.15em;
+  background: conic-gradient(transparent calc((1 - var(--sweep)) * 360deg), rgba(0, 0, 0, 0.78) 0);
+}
+
+.fightbar .slot.gcd .sweep,
+.fightbar .slot.auto .sweep {
+  background: conic-gradient(transparent calc((1 - var(--sweep)) * 360deg), rgba(0, 0, 0, 0.45) 0);
+}
+
+.fightbar .slot .time {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--heavy);
+  font-size: 1.35em;
+  color: var(--bone);
+  text-shadow: 0 0 0.1em #000, 0.04em 0.04em 0 #000, -0.04em 0.04em 0 #000, 0.04em -0.04em 0 #000, -0.04em -0.04em 0 #000;
+}
+
+.fightbar .slot .key {
+  position: absolute;
+  top: 0.15em;
+  right: 0.25em;
+  font-size: 0.62em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 1px 0 #000, 0 0 3px #000, 1px 0 0 #000, -1px 0 0 #000;
+}
+
+.fightbar .slot .cost {
+  position: absolute;
+  bottom: 0.15em;
+  right: 0.3em;
+  font-size: 0.6em;
+  font-weight: 700;
+  color: var(--power);
+  text-shadow: 0 1px 0 #000, 0 0 3px #000, 1px 0 0 #000, -1px 0 0 #000;
+}
+
+/* Cannot go: greyed. Short of the resource: the game's blue tint. Out of reach: the key turns red. */
+.fightbar .slot.locked .icon,
+.fightbar .slot.cooling .icon {
+  filter: saturate(0.5) brightness(0.55);
+}
+
+.fightbar .slot.short .icon {
+  filter: saturate(0.2) brightness(0.6) sepia(1) hue-rotate(185deg) saturate(2.4);
+}
+
+.fightbar .slot.far .key {
+  color: #ff3b3b;
+}
+
+.fightbar .slot.active .rim {
+  box-shadow:
+    inset 0 0 0 1px #0a0706,
+    inset 0 0 0 2px var(--gold),
+    inset 0 0 0 3px #0a0706,
+    inset 0 0 0.6em rgba(255, 209, 0, 0.6),
+    0 0 0.8em rgba(255, 209, 0, 0.8);
+}
+
+.fightbar .slot.auto.on .rim {
+  box-shadow:
+    inset 0 0 0 1px #0a0706,
+    inset 0 0 0 2px var(--gold),
+    inset 0 0 0 3px #0a0706,
+    inset 0 0.5em 0.6em rgba(0, 0, 0, 0.45);
+  animation: autopulse 1s ease-in-out infinite;
+}
+
+@keyframes autopulse {
+  50% {
+    box-shadow:
+      inset 0 0 0 1px #0a0706,
+      inset 0 0 0 2px #fff2a0,
+      inset 0 0 0 3px #0a0706,
+      inset 0 0 0.6em rgba(255, 209, 0, 0.5);
+  }
+}

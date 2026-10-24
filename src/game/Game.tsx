@@ -10,6 +10,7 @@ import { pictureUrl } from './pixels';
 import { LEGENDS, legendTiles, type Tile } from './roster';
 import { Select, type Source } from './Select';
 import { Title } from './Title';
+import { FightUi } from './ui/FightUi';
 import { type Stage, stagesFor, type Ground } from './stages';
 import { Versus } from './Versus';
 
@@ -133,6 +134,11 @@ export function Game() {
         />
       );
     case 'fight':
-      return <Fight fighters={screen.fighters} stage={screen.stage} p2={p2} onBack={() => setScreen({ kind: 'select' })} />;
+      return (
+        <>
+          <Fight fighters={screen.fighters} stage={screen.stage} p2={p2} onBack={() => setScreen({ kind: 'select' })} />
+          <FightUi fighters={screen.fighters} p2={p2} assets={{ client: client.current, races: loaded.races, portraits: loaded.portraits }} />
+        </>
+      );
   }
 }
