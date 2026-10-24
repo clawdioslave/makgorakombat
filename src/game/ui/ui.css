@@ -43,14 +43,60 @@
   align-items: flex-start;
 }
 
+/* The clock plate: a bevelled dark stone between the frames, the wins as studs either side. */
 .wowui .clock-plate {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.35em 0.7em 0.4em;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.35)),
+    linear-gradient(90deg, #221c19, var(--stone) 50%, #221c19);
+  border: 2px solid #0a0706;
+  border-radius: 0.5em 0.5em 1.4em 1.4em;
+  box-shadow:
+    inset 0 0 0 1px var(--stone-light),
+    inset 0 0 0 2px #0a0706,
+    inset 0 0 0 3px #6b5a2a,
+    inset 0 2px 0 3px rgba(255, 230, 160, 0.15),
+    0 0.2em 0.5em rgba(0, 0, 0, 0.7);
+}
+
+.wowui .clock-plate .face {
   text-align: center;
-  padding-top: 0.2em;
+  min-width: 4.5em;
+}
+
+.wowui .studs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+
+.wowui .stud {
+  width: 0.95em;
+  height: 0.95em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 45% 35%, #2a2420, #0b0808 85%);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 0 1px #0a0706,
+    0 0 0 2px #4a3f2a,
+    0 1px 0 2px rgba(255, 230, 160, 0.12);
+}
+
+.wowui .stud.won {
+  background: radial-gradient(circle at 40% 30%, #fff6c0, var(--gold) 40%, #a8700a 95%);
+  box-shadow:
+    inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+    0 0 0 1px #0a0706,
+    0 0 0 2px #8a6a1a,
+    0 0 0.6em rgba(255, 209, 0, 0.55);
 }
 
 .wowui .clock {
   font-family: var(--heavy);
-  font-size: 3.2em;
+  font-size: 2.9em;
   line-height: 1;
   color: var(--bone);
   text-shadow:
@@ -78,7 +124,7 @@
 /* ---- the unit frame ---------------------------------------------------------------------- */
 
 .unitframe {
-  width: 23em;
+  width: 25.5em;
   filter: drop-shadow(0 0.2em 0.4em rgba(0, 0, 0, 0.7));
 }
 
@@ -145,38 +191,6 @@
   box-shadow: inset 0 0 0.8em rgba(0, 0, 0, 0.9);
 }
 
-.unitframe .pips {
-  position: absolute;
-  bottom: -0.35em;
-  right: -0.35em;
-  display: flex;
-  gap: 0.15em;
-}
-
-.unitframe.p2 .pips {
-  right: auto;
-  left: -0.35em;
-}
-
-.unitframe .pip {
-  width: 1.3em;
-  height: 1.3em;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 40%, #2a2420, #0b0808 80%);
-  box-shadow:
-    0 0 0 2px #0a0706,
-    0 0 0 3px #7a6830,
-    0 0.1em 0.3em rgba(0, 0, 0, 0.8);
-}
-
-.unitframe .pip.won {
-  background: radial-gradient(circle at 50% 35%, #fff2a0, var(--gold) 45%, #b8860b 90%);
-  box-shadow:
-    0 0 0 2px #0a0706,
-    0 0 0 3px #b8860b,
-    0 0 0.6em rgba(255, 209, 0, 0.6);
-}
-
 .unitframe .bars {
   flex: 1;
   min-width: 0;
@@ -185,21 +199,22 @@
   gap: 0.2em;
 }
 
+/* The name in gold on its own line, the class or title smaller beneath it. */
 .unitframe .name {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5em;
+  flex-direction: column;
+  align-items: flex-start;
   padding: 0.1em 0.4em 0.15em;
   background: linear-gradient(180deg, #0f0b0a, #1b1512);
   border: 1px solid #0a0706;
   box-shadow: inset 0 0 0 1px #3d3328;
   white-space: nowrap;
   overflow: hidden;
+  line-height: 1.15;
 }
 
 .unitframe.p2 .name {
-  flex-direction: row-reverse;
+  align-items: flex-end;
 }
 
 .unitframe .name .who {
@@ -208,16 +223,27 @@
   letter-spacing: 0.04em;
   color: var(--gold);
   text-shadow: 0 1px 1px #000;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.unitframe .name .who.small {
+  font-size: 0.85em;
+  letter-spacing: 0.02em;
+}
+
+.unitframe .name .who.tiny {
+  font-size: 0.72em;
+  letter-spacing: 0;
+}
+
 .unitframe .name .class {
-  font-size: 0.6em;
+  font-size: 0.58em;
   font-weight: 700;
-  letter-spacing: 0.1em;
-  color: #b5a79a;
-  flex: none;
+  letter-spacing: 0.12em;
+  color: #c9b27a;
+  text-shadow: 0 1px 1px #000;
 }
 
 .unitframe .bar {
@@ -259,20 +285,22 @@
   pointer-events: none;
 }
 
+/* The numbers as the game's status text: white, shadowed, centred on the bar. */
 .unitframe .bar .text {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 0.78em;
+  font-family: 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 0.85em;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
   color: #fff;
-  text-shadow: 0 1px 0 #000, 0 0 3px #000, 1px 0 0 #000, -1px 0 0 #000;
+  text-shadow: 1px 1px 0 #000, 0 0 3px #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
 }
 
 .unitframe .bar.power .text {
-  font-size: 0.62em;
+  font-size: 0.7em;
 }
 
 /* ---- buffs and debuffs ------------------------------------------------------------------- */
@@ -459,6 +487,20 @@
   color: var(--gold);
 }
 
+.wowui .hint.end {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 7.2em;
+  text-align: center;
+  font-size: 1em;
+  color: var(--gold);
+}
+
+.wowui .hint.end b {
+  color: var(--bone);
+}
+
 .fightbar {
   display: flex;
   gap: 0.3em;
@@ -475,6 +517,7 @@
     0 0.3em 0.9em rgba(0, 0, 0, 0.8);
 }
 
+/* Slots take the pointer, so hovering one shows what it is and why it cannot go. */
 .fightbar .slot {
   position: relative;
   width: 3.6em;
@@ -482,6 +525,8 @@
   background: radial-gradient(circle at 50% 40%, #2a1e1a, #0b0808 80%);
   overflow: hidden;
   border-radius: 0.2em;
+  pointer-events: auto;
+  cursor: default;
 }
 
 .fightbar .slot .icon {
@@ -566,9 +611,26 @@
 }
 
 /* Cannot go: greyed. Short of the resource: the game's blue tint. Out of reach: the key turns red. */
-.fightbar .slot.locked .icon,
+.fightbar .slot.dim .icon {
+  filter: saturate(0.15) brightness(0.5);
+}
+
 .fightbar .slot.cooling .icon {
-  filter: saturate(0.5) brightness(0.55);
+  filter: saturate(0.6) brightness(0.65);
+}
+
+/* The flash of a pressed key: the game's button-down highlight. */
+.fightbar .slot.flash .rim {
+  box-shadow:
+    inset 0 0 0 1px #0a0706,
+    inset 0 0 0 2px #fff6c0,
+    inset 0 0 0 3px var(--gold),
+    inset 0 0 1em rgba(255, 220, 90, 0.75),
+    0 0 1em rgba(255, 209, 0, 0.9);
+}
+
+.fightbar .slot.flash .icon {
+  filter: brightness(1.35);
 }
 
 .fightbar .slot.short .icon {

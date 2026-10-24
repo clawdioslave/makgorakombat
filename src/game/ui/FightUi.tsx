@@ -35,6 +35,17 @@ interface Frame {
 /** Status effects whose icons are wanted before they appear. */
 const EFFECT_NAMES = ['Stunned', 'Feared', 'Slowed', 'Shield', 'Evasion', 'Riposte', 'Interrupted'];
 
+/** A player's rounds won as studs on the clock plate: gold when won, recessed until then. */
+function Studs({ wins, side }: { wins: number; side: 0 | 1 }) {
+  return (
+    <div class={`studs p${side + 1}`}>
+      {Array.from({ length: ROUNDS_TO_WIN }, (_, n) => (
+        <span class={`stud ${n < wins ? 'won' : ''}`} key={n} />
+      ))}
+    </div>
+  );
+}
+
 const liveMatch = (): Match | undefined => (window as unknown as { mk?: { match?: () => Match } }).mk?.match?.();
 
 export function FightUi({ fighters, p2, assets }: FightUiProps) {
@@ -104,13 +115,22 @@ export function FightUi({ fighters, p2, assets }: FightUiProps) {
   return (
     <div class="wowui">
       <div class="top">
-        <UnitFrame side={0} view={frame.views[0]} portrait={portraits[0]} effectIcons={spellIcons} spellIcons={spellIcons} roundsToWin={ROUNDS_TO_WIN} />
+        <UnitFrame side={0} view={frame.views[0]} portrait={portraits[0]} effectIcons={spellIcons} spellIcons={spellIcons} />
         <div class="clock-plate">
-          <div class={`clock ${frame.seconds <= 10 ? 'late' : ''}`}>{frame.seconds}</div>
-          <div class="round">{BRAND.round(frame.round)}</div>
+          <Studs wins={frame.views[0].wins} side={0} />
+          <div class="face">
+            <div class={`clock ${frame.seconds <= 10 ? 'late' : ''}`}>{frame.seconds}</div>
+            <div class="round">{BRAND.round(frame.round)}</div>
+          </div>
+          <Studs wins={frame.views[1].wins} side={1} />
         </div>
-        <UnitFrame side={1} view={frame.views[1]} portrait={portraits[1]} effectIcons={spellIcons} spellIcons={spellIcons} roundsToWin={ROUNDS_TO_WIN} />
+        <UnitFrame side={1} view={frame.views[1]} portrait={portraits[1]} effectIcons={spellIcons} spellIcons={spellIcons} />
       </div>
+      {frame.phase === 'matchEnd' && (
+        <div class="hint end">
+          <b>ENTER</b> rematch · <b>ESC</b> new champions
+        </div>
+      )}
       <div class="bottom">
         {([0, 1] as const).map((i) => (
           <div class={`bar-stack p${i + 1}`} key={i}>

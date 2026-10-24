@@ -3,8 +3,8 @@ import type { EffectView, FighterView } from '../../engine/view';
 /*
  * A unit frame as the game draws its player and target frames: the round portrait on the
  * outer side, the name in gold on a dark plate, the green health bar and the class resource
- * bar beneath it in the resource's colour, both with their numbers; the rounds won as
- * level-like discs under the portrait; the cast bar and the row of buffs and debuffs below.
+ * bar beneath it in the resource's colour, both with their numbers; the cast bar and the row
+ * of buffs and debuffs below. The rounds won are studs on the clock plate between the frames.
  */
 
 export interface UnitFrameProps {
@@ -15,29 +15,25 @@ export interface UnitFrameProps {
   effectIcons: ReadonlyMap<string, string>;
   /** The cast's spell icon, by name. */
   spellIcons: ReadonlyMap<string, string>;
-  roundsToWin: number;
 }
 
 const DEBUFFS: ReadonlySet<EffectView['kind']> = new Set(['stun', 'fear', 'slow', 'dot', 'lockout']);
 
-export function UnitFrame({ side, view, portrait, effectIcons, spellIcons, roundsToWin }: UnitFrameProps) {
+export function UnitFrame({ side, view, portrait, effectIcons, spellIcons }: UnitFrameProps) {
   const hp = Math.max(0, Math.min(1, view.hp.current / view.hp.max));
   const res = Math.max(0, Math.min(1, view.resource.current / view.resource.max));
   const dead = view.state === 'death';
+  // A long legend name is set smaller so it fits the plate on one line.
+  const fit = view.name.length > 18 ? 'tiny' : view.name.length > 13 ? 'small' : '';
   return (
     <div class={`unitframe p${side + 1} ${dead ? 'dead' : ''}`}>
       <div class="plate">
         <div class="portrait">
           {portrait ? <img src={portrait} alt="" draggable={false} /> : <span class="letter">{view.name.charAt(0)}</span>}
-          <div class="pips">
-            {Array.from({ length: roundsToWin }, (_, pip) => (
-              <span class={`pip ${pip < view.wins ? 'won' : ''}`} key={pip} />
-            ))}
-          </div>
         </div>
         <div class="bars">
           <div class="name">
-            <span class="who">{view.name}</span>
+            <span class={`who ${fit}`}>{view.name}</span>
             <span class="class">{view.className}</span>
           </div>
           <div class="bar health" style={{ '--fill': hp }}>
