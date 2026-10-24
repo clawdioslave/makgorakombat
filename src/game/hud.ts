@@ -41,6 +41,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, width: number, height: nu
   };
 
   groundLine(ctx, at);
+  hurtFlash(ctx, w, h, match, human);
   nameplates(ctx, match, names, at);
   sparks(ctx, match, at);
   projectiles(ctx, match, at);
@@ -138,6 +139,22 @@ function nameplates(ctx: CanvasRenderingContext2D, match: Match, names: [string,
   });
 }
 
+/** A red flash at the edges of the screen when a player's fighter takes a blow from the computer; deeper for a crit. */
+function hurtFlash(ctx: CanvasRenderingContext2D, w: number, h: number, match: Match, human: [boolean, boolean]): void {
+  let strength = 0;
+  for (const text of match.texts) {
+    if (text.t > 14 || !human[text.side] || human[text.from]) continue;
+    if (text.kind !== 'damage' && text.kind !== 'crit') continue;
+    strength = Math.max(strength, (text.kind === 'crit' ? 0.55 : 0.3) * (1 - text.t / 14));
+  }
+  if (strength <= 0) return;
+  const glow = ctx.createRadialGradient(w / 2, h / 2, h * 0.35, w / 2, h / 2, h * 0.85);
+  glow.addColorStop(0, 'rgba(200, 0, 0, 0)');
+  glow.addColorStop(1, `rgba(200, 0, 0, ${strength})`);
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, w, h);
+}
+
 /** Sparks where a blow landed: yellow hit, orange crit, blue-white block, silver parry, violet spell. */
 function sparks(ctx: CanvasRenderingContext2D, match: Match, at: (p: readonly [number, number, number]) => [number, number] | undefined): void {
   for (const spark of match.sparks) {
@@ -147,9 +164,19 @@ function sparks(ctx: CanvasRenderingContext2D, match: Match, at: (p: readonly [n
     const life = Math.max(0, 1 - spark.t / Math.max(1, spark.life));
     const colour = { hit: '255, 220, 90', crit: '255, 120, 40', block: '140, 200, 255', parry: '230, 230, 240', spell: '190, 120, 255' }[spark.kind];
     ctx.strokeStyle = `rgba(${colour}, ${life})`;
-    ctx.lineWidth = 3 * life + 1;
-    const rays = spark.kind === 'block' || spark.kind === 'parry' ? 6 : 10;
-    const reach = (spark.kind === 'crit' ? 24 : 18) + spark.t * 4;
+    ctx.lineWidth = (spark.kind === 'crit' ? 5 : 3.5) * life + 1;
+    const rays = spark.kind === 'block' || spark.kind === 'parry' ? 6 : spark.kind === 'crit' ? 14 : 10;
+    const reach = (spark.kind === 'crit' ? 34 : 24) + spark.t * (spark.kind === 'crit' ? 6 : 4);
+    // A flash at the point of impact on the first frames.
+    if (spark.t < 4 && spark.kind !== 'block' && spark.kind !== 'parry') {
+      const flash = ctx.createRadialGradient(sx, sy, 0, sx, sy, spark.kind === 'crit' ? 60 : 36);
+      flash.addColorStop(0, `rgba(255, 250, 230, ${0.8 * (1 - spark.t / 4)})`);
+      flash.addColorStop(1, `rgba(${colour}, 0)`);
+      ctx.fillStyle = flash;
+      ctx.beginPath();
+      ctx.arc(sx, sy, spark.kind === 'crit' ? 60 : 36, 0, Math.PI * 2);
+      ctx.fill();
+    }
     for (let r = 0; r < rays; r++) {
       const angle = (r / rays) * Math.PI * 2 + spark.t * 0.1;
       ctx.beginPath();

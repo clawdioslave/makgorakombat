@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { type Inputs, type Match, newMatch, poseOf, tick } from '../engine/engine';
+import { type Inputs, type Match, newMatch, poseOf, type Spark, tick } from '../engine/engine';
 import { InputReader } from '../engine/input';
 import { type MoveTable, resolveMoves } from '../engine/moves';
 import { type FighterView, fighterView } from '../engine/view';
@@ -25,6 +25,33 @@ interface FightProps {
 }
 
 const MAX_STEPS = 4;
+
+/** How hard the camera shakes for each kind of landed blow, in pan units (a fraction of half the view's height). */
+const SHAKE: Record<Spark['kind'], number> = { hit: 0.025, crit: 0.06, spell: 0.03, block: 0.012, parry: 0.015 };
+const SHAKE_DECAY = 0.82;
+
+/** The camera's shake: kicked by each new spark, dying away over a few frames, deterministic in the frame count. */
+class Shaker {
+  private readonly seen = new WeakSet<Spark>();
+  private amount = 0;
+
+  /** Note this frame's new sparks and step the shake. */
+  observe(match: Match): void {
+    for (const spark of match.sparks) {
+      if (this.seen.has(spark)) continue;
+      this.seen.add(spark);
+      this.amount = Math.max(this.amount, SHAKE[spark.kind]);
+    }
+    this.amount *= SHAKE_DECAY;
+    if (this.amount < 0.0005) this.amount = 0;
+  }
+
+  /** The camera offset this frame. */
+  offset(frame: number): { x: number; y: number } {
+    if (this.amount === 0) return { x: 0, y: 0 };
+    return { x: Math.sin(frame * 2.9) * this.amount, y: Math.cos(frame * 4.1) * this.amount * 0.7 };
+  }
+}
 
 /** Classes whose off-hand, beside a one-hander, is a shield: warrior, paladin, shaman. */
 const SHIELD_CLASSES = new Set([1, 2, 7]);
@@ -80,6 +107,7 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
     let last = performance.now();
     let owed = 0;
     const times = { engine: 0, pose: 0, draw: 0 };
+    const shaker = new Shaker();
     const loop = (now: number) => {
       frame = requestAnimationFrame(loop);
       const current = match.current!;
@@ -95,12 +123,17 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
         steps++;
       }
       if (steps === MAX_STEPS) owed = 0;
-      if (steps > 0) mixer.observe(current);
+      if (steps > 0) {
+        mixer.observe(current);
+        shaker.observe(current);
+      }
       const t1 = performance.now();
+      const shake = shaker.offset(current.frame);
+      const camera = { ...CAMERA, panX: CAMERA.panX + shake.x, panY: CAMERA.panY + shake.y };
       ring.frame(current.fighters.map((fighter) => fighter.x));
       ring.draw(
         current.fighters.map((fighter, i) => ({ ...poseOf(current, i as 0 | 1), x: fighter.x, z: fighter.z, facing: fighter.facing })),
-        CAMERA,
+        camera,
       );
       const t2 = performance.now();
       const hud = overlay.current!;
@@ -115,7 +148,7 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
       const note = debugRef.current
         ? `engine ${times.engine.toFixed(2)} ms · pose+draw ${times.pose.toFixed(2)} ms · hud ${times.draw.toFixed(2)} ms · sounds ${mixer.played}`
         : mutedRef.current ? 'MUTED · M' : undefined;
-      drawHud(ctx, hud.width, hud.height, current, names, (point) => ring.project(CAMERA, point), { human: [true, p2 !== 'cpu'], debug: note });
+      drawHud(ctx, hud.width, hud.height, current, names, (point) => ring.project(camera, point), { human: [true, p2 !== 'cpu'], debug: note });
     };
     frame = requestAnimationFrame(loop);
 

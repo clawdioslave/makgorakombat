@@ -253,7 +253,7 @@ const SLOW_FACTOR = 0.5;
 const BLOCK_FACTOR = 0.6;
 const CRIT_FACTOR = 2;
 /** Speed given to the target by a blow; it decays by 0.82 a frame, so the distance is about 5.5 times this. The game has none; a nudge sells the impact. */
-const PUSHBACK = { swing: 0.02, ability: 0.05, spell: 0.03, bolt: 0.05, charge: 0.2 } as const;
+const PUSHBACK = { swing: 0.035, ability: 0.07, spell: 0.03, bolt: 0.05, charge: 0.2 } as const;
 
 /** The hit table. Parry only from the front, block only with a shield, none of them against a helpless target. */
 export const HIT_TABLE = { miss: 0.05, dodge: 0.06, evasion: 0.5, parry: 0.06, block: 0.1, crit: 0.15, spellMiss: 0.03 } as const;
@@ -965,7 +965,7 @@ function strike(match: Match, ai: 0 | 1, ti: 0 | 1, blow: Blow, dir: number, spa
   const wasCasting = target.cast !== undefined;
   if (amount > 0) {
     target.vx = dir * blow.pushback * (outcome === 'block' ? 0.5 : 1);
-    const stop = blow.hitstop + (outcome === 'crit' ? 4 : 0);
+    const stop = blow.hitstop + (outcome === 'crit' ? 6 : 0);
     target.hitstop = Math.max(target.hitstop, stop);
     attacker.hitstop = Math.max(attacker.hitstop, stop);
     spark(match, sparkX, sparkZ, outcome === 'block' ? 'block' : outcome === 'crit' ? 'crit' : blow.roll === 'spell' ? 'spell' : 'hit');
@@ -1044,7 +1044,7 @@ function attacks(match: Match, i: 0 | 1): void {
     }
     if (!inReach(f, target, table.weapon.range + REACH_SLACK, false)) return;
     f.hitDone = true;
-    strike(match, i, ti, { damage: table.weapon.damage, roll: 'melee', ability: undefined, pushback: PUSHBACK.swing, hitstop: 6 }, f.facing, target.x - f.facing * 0.3, 1.3 + target.z);
+    strike(match, i, ti, { damage: table.weapon.damage, roll: 'melee', ability: undefined, pushback: PUSHBACK.swing, hitstop: 8 }, f.facing, target.x - f.facing * 0.3, 1.3 + target.z);
     return;
   }
 
@@ -1067,7 +1067,7 @@ function attacks(match: Match, i: 0 | 1): void {
   if (!inReach(f, target, a.range + REACH_SLACK, a.both)) return;
   f.hitDone = true;
   const dir = target.x >= f.x ? 1 : -1;
-  strike(match, i, ti, { damage: a.damage, roll: 'melee', ability: a, pushback: PUSHBACK.ability, hitstop: 10 }, dir, target.x - dir * 0.3, 1.3 + target.z);
+  strike(match, i, ti, { damage: a.damage, roll: 'melee', ability: a, pushback: PUSHBACK.ability, hitstop: 12 }, dir, target.x - dir * 0.3, 1.3 + target.z);
 }
 
 function projectiles(match: Match): void {
