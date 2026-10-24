@@ -53,9 +53,13 @@ describe('the stages', () => {
   it('are offered by the maps on disk and the game the install is', () => {
     const classic = stagesFor([0, 1], 'wow_classic_beta').map((s) => s.slug);
     expect(classic).toContain('valley-of-heroes');
-    expect(classic).not.toContain('dalaran');
+    expect(classic).toContain('gurubashi');
     const retail = stagesFor([0, 1, 530, 571], 'wow').map((s) => s.slug);
-    expect(retail).toContain('dalaran');
+    expect(retail).toContain('thunder-bluff');
     expect(retail).not.toContain('valley-of-heroes');
+    // A map the install lacks takes its stages with it.
+    expect(stagesFor([1], 'wow').map((s) => s.slug)).not.toContain('gurubashi');
+    // The obstructed and the cut ones stay out.
+    for (const gone of ['valley-of-trials', 'sentinel-hill', 'dalaran', 'ring-of-trials', 'icecrown']) expect(retail).not.toContain(gone);
   });
 });

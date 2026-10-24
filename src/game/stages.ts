@@ -34,18 +34,18 @@ export interface Stage {
 /** How far a stage draws unless it says otherwise: enough for a skyline, little enough for 60 fps. */
 export const REACH = 260;
 
+/**
+ * Cut to the six that read clean behind a fight (William, 24 Oct 2026). Left out: the Valley of
+ * Trials and Sentinel Hill, where buildings and rocks stood in front of the fighters, and
+ * Dalaran, the Ring of Trials and the Gate of Icecrown. Their spots are in git history.
+ */
 export const STAGES: Stage[] = [
   { slug: 'gurubashi', name: 'Gurubashi Arena', where: 'Stranglethorn Vale', map: 0, x: -13215, y: 250, facing: 0, reach: REACH, why: 'The pit: the game\'s own fighting ring, the stands all round.' },
-  { slug: 'valley-of-trials', name: 'The Valley of Trials', where: 'Durotar', map: 1, x: -605, y: -4240, facing: 0, reach: REACH, why: 'The ring of totems outside the Den, where every orc throws a first punch.' },
   { slug: 'crossroads', name: 'The Crossroads', where: 'The Barrens', map: 1, x: -456, y: -2652, facing: 315, reach: REACH, why: 'The square under the watchtower, Barrens sky behind.' },
   { slug: 'valley-of-heroes', name: 'The Valley of Heroes', where: 'Stormwind', map: 0, x: -8975, y: 503, facing: 127, reach: REACH, only: 'classic', why: 'The bridge in from the gate, the city\'s blue roofs up the street; Cataclysm rebuilt it.' },
   { slug: 'goldshire', name: 'Goldshire', where: 'Elwynn Forest', map: 0, x: -9400, y: 50, facing: 315, reach: REACH, why: 'The flowered lawn beside the Lion\'s Pride, where duels have been fought since 2004.' },
-  { slug: 'sentinel-hill', name: 'Sentinel Hill', where: 'Westfall', map: 0, x: -10545, y: 1075, facing: 135, reach: REACH, why: 'Dry grass on the hill, the farmstead and the fields below.' },
   { slug: 'darnassus', name: 'The Gardens', where: 'Darnassus', map: 1, x: 9660, y: 2520, facing: 0, reach: REACH, why: 'Under the great tree, a canopy over the haze.' },
   { slug: 'thunder-bluff', name: 'Thunder Bluff', where: 'Mulgore', map: 1, x: -1300, y: 30, facing: 0, reach: REACH, why: 'The high rise: tents, totems and a drop on every side.' },
-  { slug: 'dalaran', name: 'Dalaran', where: 'Northrend', map: 571, x: 5805, y: 628, z: 650, facing: 90, reach: REACH, why: 'The floating city at street level, violet towers over the fight.' },
-  { slug: 'ring-of-trials', name: 'The Ring of Trials', where: 'Nagrand', map: 559, x: 4055, y: 2920, facing: 0, reach: REACH, why: 'The arena itself: cobbles, pillars and the orange sails, as the arena map keeps it.' },
-  { slug: 'icecrown', name: 'The Gate of Icecrown', where: 'Icecrown Citadel', map: 571, x: 5786, y: 2070, facing: 45, reach: REACH, why: 'The black ramp up to the Lich King\'s door, saronite spikes in the haze.' },
 ];
 
 /** The stages an install can draw: those whose map it has on disk, and whose ground its game still has. */

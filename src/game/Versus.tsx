@@ -57,7 +57,8 @@ const keyOf = (entry: Entry) => (entry.kind === 'stage' ? `stage:${entry.stage.s
 export function Versus({ client, fighters, stages, screens, onFight, onBack }: VersusProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const arena = useRef<Arena>(null);
-  const entries: Entry[] = [...stages.map((stage): Entry => ({ kind: 'stage', stage })), ...screens.map((screen): Entry => ({ kind: 'screen', screen }))];
+  // The real places only; the loading screens are there for an install that has none of them.
+  const entries: Entry[] = stages.length > 0 ? stages.map((stage): Entry => ({ kind: 'stage', stage })) : screens.map((screen): Entry => ({ kind: 'screen', screen }));
   const [cursor, setCursor] = useState(() => (stages.length > 0 ? 0 : Math.max(0, screens.findIndex((screen) => STAGE_LIKE.test(screen.name)))));
   const [thumbs, setThumbs] = useState<Map<number, string>>(new Map());
   const [status, setStatus] = useState<string>();
