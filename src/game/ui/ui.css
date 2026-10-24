@@ -528,11 +528,13 @@
   cursor: default;
 }
 
+/* The picture fills the slot inside the rim; a replaced element needs its size said outright. */
 .fightbar .slot .icon {
   position: absolute;
-  inset: 0.18em;
-  width: auto;
-  height: auto;
+  top: 0.18em;
+  left: 0.18em;
+  width: calc(100% - 0.36em);
+  height: calc(100% - 0.36em);
   border-radius: 0.15em;
   object-fit: cover;
   transition: filter 0.1s;
