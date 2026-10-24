@@ -1,0 +1,583 @@
+/*
+ * The game's own interface look, on every screen: Friz Quadrata (read from the player's install)
+ * for the words, the tooltip's near-black box with its silver rim, bag slots with a border in the
+ * item quality's colour, dark panels with a gold title. Loaded after style.css, so where a screen
+ * had its own look this one wins.
+ */
+
+:root {
+  --friz: 'WoW Friz', 'Cinzel', Palatino, Georgia, serif;
+  --narrow: 'WoW Narrow', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  --morpheus: 'WoW Morpheus', 'Cinzel', Palatino, serif;
+  /* Every label in the game's face. */
+  --serif: var(--friz);
+
+  /* Item quality, as the game colours names and borders. */
+  --q-poor: #9d9d9d;
+  --q-common: #ffffff;
+  --q-uncommon: #1eff00;
+  --q-rare: #0070dd;
+  --q-epic: #a335ee;
+  --q-legendary: #ff8000;
+
+  --wow-gold: #ffd100;
+  --wow-green: #1eff00;
+  --wow-red: #ff2020;
+  --wow-grey: #808080;
+  --wow-blue: #71d5ff;
+  --wow-alliance: #4a8eff;
+  --wow-horde: #ff4040;
+
+  --tt-rim: #a9a9b6;
+  --panel: rgba(14, 14, 18, 0.92);
+}
+
+/* Running text in the game's face too, once it is loaded; plain sans until then. */
+:root.wow-fonts body {
+  font-family: 'WoW Friz', system-ui, sans-serif;
+}
+
+/* ---- the tooltip ------------------------------------------------------------------------- */
+
+.wow-tooltip {
+  min-width: 13em;
+  max-width: 21em;
+  padding: 0.5em 0.7em 0.6em;
+  background: linear-gradient(180deg, rgba(10, 10, 26, 0.93), rgba(3, 3, 10, 0.94));
+  border: 1px solid var(--tt-rim);
+  border-radius: 0.35em;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 1px rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(0, 0, 0, 0.8),
+    0 0.3em 1em rgba(0, 0, 0, 0.55);
+  font-family: var(--friz);
+  font-weight: 400;
+  font-size: 0.82rem;
+  line-height: 1.3;
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: left;
+  white-space: normal;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.wow-tooltip .line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1.4em;
+}
+
+.wow-tooltip .line .r {
+  flex: none;
+  text-align: right;
+}
+
+.wow-tooltip .line.tt-name {
+  font-size: 1.2em;
+  line-height: 1.25;
+}
+
+.wow-tooltip .line.tt-small {
+  font-size: 0.85em;
+}
+
+.wow-tooltip .tt-gap {
+  height: 0.55em;
+}
+
+.h-white { color: #fff; }
+.h-gold { color: var(--wow-gold); }
+.h-green { color: var(--wow-green); }
+.h-red { color: var(--wow-red); }
+.h-grey { color: var(--wow-grey); }
+.h-blue { color: var(--wow-blue); }
+.h-alliance { color: var(--wow-alliance); }
+.h-horde { color: var(--wow-horde); }
+.h-poor { color: var(--q-poor); }
+.h-common { color: var(--q-common); }
+.h-uncommon { color: var(--q-uncommon); }
+.h-rare { color: #3a9bff; }
+.h-epic { color: #b552ff; }
+.h-legendary { color: var(--q-legendary); }
+
+/* A tooltip that appears over whatever it sits in while the pointer is on it. */
+.hover-tip {
+  position: absolute;
+  bottom: calc(100% + 0.6em);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: none;
+  width: max-content;
+  max-width: 19em;
+  pointer-events: none;
+}
+
+:hover > .hover-tip {
+  display: block;
+}
+
+/* ---- bag slots and panels ---------------------------------------------------------------- */
+
+/* A slot in a bag: dark, with a thin quality border over the picture. --q sets the border. */
+.wow-slot {
+  --q: #3a3a40;
+  position: relative;
+  background: radial-gradient(circle at 50% 40%, #1d1d22, #08080a 80%);
+  border-radius: 0.2em;
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0.6em rgba(0, 0, 0, 0.9);
+}
+
+.wow-slot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 2px var(--q),
+    inset 0 0 0 3px rgba(0, 0, 0, 0.55),
+    inset 0 0 0.7em color-mix(in srgb, var(--q) 40%, transparent);
+  pointer-events: none;
+}
+
+.q-poor { --q: var(--q-poor); }
+.q-common { --q: #c8c8c8; }
+.q-uncommon { --q: var(--q-uncommon); }
+.q-rare { --q: var(--q-rare); }
+.q-epic { --q: var(--q-epic); }
+.q-legendary { --q: var(--q-legendary); }
+
+/* A bag's frame: a dark slate panel with a grey rim and a gold title. */
+.wow-panel {
+  background: linear-gradient(180deg, rgba(30, 30, 36, 0.94), var(--panel));
+  border: 1px solid #5c5c66;
+  border-radius: 0.45em;
+  box-shadow:
+    inset 0 0 0 1px #000,
+    inset 0 1px 0 1px rgba(255, 255, 255, 0.05),
+    0 0 0 1px #000,
+    0 0.4em 1.2em rgba(0, 0, 0, 0.65);
+}
+
+.wow-title {
+  font-family: var(--friz);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--wow-gold);
+  text-shadow: 1px 1px 0 #000;
+}
+
+/* ---- the title screen -------------------------------------------------------------------- */
+
+.title .actionbar {
+  background: linear-gradient(180deg, rgba(30, 30, 36, 0.94), var(--panel));
+  border: 1px solid #5c5c66;
+  border-radius: 0.45em;
+  box-shadow:
+    inset 0 0 0 1px #000,
+    0 0 0 1px #000,
+    0 0.6em 1.6em rgba(0, 0, 0, 0.75);
+}
+
+.actionbar .slot {
+  border: none;
+  border-radius: 0.25em;
+  background: radial-gradient(circle at 50% 40%, #1d1d22, #08080a 80%);
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 2px #3a3a40,
+    inset 0 0 0 3px rgba(0, 0, 0, 0.55),
+    inset 0 0 1em rgba(0, 0, 0, 0.9);
+  color: #d8d8e0;
+  overflow: visible;
+}
+
+.actionbar .slot:hover,
+.actionbar .slot:focus-visible {
+  border: none;
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 2px var(--wow-gold),
+    inset 0 0 1.2em rgba(255, 209, 0, 0.35),
+    0 0 0.8em rgba(255, 209, 0, 0.35);
+}
+
+.actionbar .slot.lit {
+  border: none;
+  color: var(--q-legendary);
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 2px var(--q-legendary),
+    inset 0 0 1em rgba(255, 128, 0, 0.35),
+    0 0 1em rgba(255, 128, 0, 0.45);
+  animation: none;
+}
+
+.actionbar .slot .hotkey {
+  left: auto;
+  right: 0.35em;
+  top: 0.2em;
+  font-family: var(--narrow);
+  font-weight: 700;
+  color: #d0d0d0;
+}
+
+.actionbar .slot .label {
+  font-family: var(--friz);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  font-size: 0.62rem;
+  color: var(--wow-gold);
+  background: rgba(0, 0, 0, 0.55);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0 0 0.25em 0.25em;
+}
+
+.title .hint b {
+  color: var(--wow-gold);
+}
+
+/* ---- the select screen ------------------------------------------------------------------- */
+
+.select .grid {
+  padding: 0.6em 0.7em 0.8em;
+  background: linear-gradient(180deg, rgba(30, 30, 36, 0.9), rgba(14, 14, 18, 0.9));
+  border: 1px solid #5c5c66;
+  border-radius: 0.45em;
+  box-shadow:
+    inset 0 0 0 1px #000,
+    0 0 0 1px #000,
+    0 0.4em 1.2em rgba(0, 0, 0, 0.6);
+  align-self: center;
+}
+
+.select .grid .label {
+  font-family: var(--friz);
+  font-weight: 400;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  color: var(--wow-gold);
+  text-shadow: 1px 1px 0 #000;
+  margin: 0.5em 0 0.25em;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.select .grid .label:first-child {
+  margin-top: 0;
+}
+
+/* Each tile is a bag slot: legends legendary orange, your own epic purple, the races rare blue. */
+.tile {
+  border: none;
+  border-radius: 0.25em;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, #1d1d22, #08080a 80%);
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0.6em rgba(0, 0, 0, 0.9);
+}
+
+.tile > img {
+  border-radius: 0.2em;
+}
+
+.tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 2px var(--q, #3a3a40),
+    inset 0 0 0 3px rgba(0, 0, 0, 0.55),
+    inset 0 0 0.8em color-mix(in srgb, var(--q, #3a3a40) 35%, transparent);
+  pointer-events: none;
+}
+
+.tile.legend { --q: var(--q-legendary); }
+.tile.record { --q: var(--q-epic); }
+.tile.race { --q: var(--q-rare); }
+.tile.random { --q: #c8c8c8; }
+
+.tile.alliance,
+.tile.horde,
+.tile.legend {
+  border: none;
+}
+
+.tile .name {
+  z-index: 2;
+  font-family: var(--friz);
+  font-weight: 400;
+  letter-spacing: 0;
+  font-size: 0.68rem;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.85) 45%);
+  border-radius: 0 0 0.2em 0.2em;
+}
+
+.tile.legend .name {
+  color: var(--q-legendary);
+}
+
+.tile.record .name {
+  color: #c77dff;
+}
+
+.tile.create {
+  --q: #6a6a72;
+  border: none;
+  font-family: var(--friz);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--wow-gold);
+}
+
+.tile.create::before {
+  box-shadow: inset 0 0 0 1px #5c5c66;
+  border: 1px dashed #6a6a72;
+}
+
+.tile .random {
+  font-family: var(--morpheus);
+  color: var(--wow-gold);
+}
+
+/* The players' cursors: the game's yellow hover square, ringed in the player's colour. */
+.tile.p1::after,
+.tile.p2::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  background: radial-gradient(circle, rgba(255, 230, 120, 0.18), rgba(255, 230, 120, 0) 70%);
+  box-shadow: inset 0 0 0 2px rgba(255, 240, 160, 0.9);
+  pointer-events: none;
+}
+
+.tile.locked1::after,
+.tile.locked2::after {
+  content: '✓';
+  inset: auto;
+  top: 0.15em;
+  left: 0.3em;
+  z-index: 4;
+  background: none;
+  box-shadow: none;
+}
+
+.tile.locked2::after {
+  left: auto;
+  right: 0.3em;
+}
+
+/* Each player's plate is the champion's tooltip, as an item reads in a bag. */
+.plate.wow-tooltip {
+  max-width: none;
+  min-width: 0;
+  padding: 0.6em 0.85em 0.7em;
+  border: 1px solid var(--tt-rim);
+  border-radius: 0.35em;
+  font-size: 0.95rem;
+  overflow: visible;
+}
+
+.plate.wow-tooltip.p1 {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.9),
+    0 0 0 1px rgba(0, 0, 0, 0.8),
+    -0.35em 0 0 -1px var(--p1),
+    0 0.3em 1em rgba(0, 0, 0, 0.55);
+}
+
+.plate.wow-tooltip.p2 {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.9),
+    0 0 0 1px rgba(0, 0, 0, 0.8),
+    0.35em 0 0 -1px var(--p2),
+    0 0.3em 1em rgba(0, 0, 0, 0.55);
+}
+
+.plate.wow-tooltip .line.tt-name {
+  font-size: 1.45em;
+}
+
+.plate.wow-tooltip .who {
+  font-family: var(--friz);
+  font-size: 0.72em;
+  letter-spacing: 0.15em;
+  color: var(--wow-grey);
+}
+
+.plate.wow-tooltip .class {
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  margin-right: 0.3em;
+  border-radius: 0.15em;
+  border: 1px solid #000;
+}
+
+.plate .stamp {
+  font-family: var(--friz);
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  color: var(--wow-gold);
+  border-color: var(--wow-gold);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.select .controls,
+.versus .controls {
+  font-family: var(--friz);
+  letter-spacing: 0.02em;
+  color: #b8b8c0;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.select .controls b,
+.versus .controls b {
+  color: var(--wow-gold);
+}
+
+/* ---- the versus screen ------------------------------------------------------------------- */
+
+.versus .plate .title {
+  font-family: var(--friz);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--wow-gold);
+  text-shadow: 1px 1px 0 #000, 0 0 0.6em #000;
+}
+
+.versus .stages {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.8) 45%);
+}
+
+.versus .stages .label {
+  font-family: var(--friz);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--wow-gold);
+  text-shadow: 1px 1px 0 #000;
+}
+
+.versus .strip {
+  height: 6.2em;
+}
+
+/* Stages are slots: a place in the world epic purple, a loading screen common white. */
+.versus .stage {
+  --q: #c8c8c8;
+  position: relative;
+  border: none;
+  border-radius: 0.25em;
+  overflow: visible;
+  background: radial-gradient(circle at 50% 40%, #1d1d22, #08080a 80%);
+  box-shadow: 0 0 0 1px #000;
+}
+
+.versus .stage.world {
+  --q: var(--q-epic);
+}
+
+.versus .stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 2px var(--q),
+    inset 0 0 0 3px rgba(0, 0, 0, 0.55),
+    inset 0 0 0.8em color-mix(in srgb, var(--q) 35%, transparent);
+  pointer-events: none;
+}
+
+.versus .stage img {
+  border-radius: 0.2em;
+}
+
+.versus .stage.here {
+  z-index: 2;
+  border: none;
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 1em color-mix(in srgb, var(--q) 70%, transparent);
+}
+
+.versus .stage.here::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px rgba(255, 240, 160, 0.9);
+  background: radial-gradient(circle, rgba(255, 230, 120, 0.12), rgba(255, 230, 120, 0) 70%);
+  pointer-events: none;
+}
+
+.versus .stage .wow-tooltip {
+  position: absolute;
+  bottom: calc(100% + 0.8em);
+  left: 50%;
+  transform: translateX(-50%) scale(0.85);
+  transform-origin: 50% 100%;
+  width: max-content;
+  max-width: 22em;
+  z-index: 5;
+}
+
+/* ---- the guide --------------------------------------------------------------------------- */
+
+.guide {
+  background: linear-gradient(180deg, rgba(30, 30, 36, 0.97), rgba(10, 10, 14, 0.97));
+  border: 1px solid #5c5c66;
+  border-radius: 0.45em;
+  box-shadow:
+    inset 0 0 0 1px #000,
+    0 0 0 1px #000,
+    0 1.2em 3em rgba(0, 0, 0, 0.9);
+}
+
+.guide .tabs {
+  border-bottom: 1px solid #3a3a42;
+}
+
+.guide .tabs button {
+  font-family: var(--friz);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: #b8b8c0;
+}
+
+.guide .tabs button.here {
+  color: var(--wow-gold);
+  border-bottom-color: var(--wow-gold);
+}
+
+.guide .keys th {
+  font-family: var(--friz);
+  font-weight: 400;
+  color: var(--wow-gold);
+}
+
+.guide .keys th,
+.guide .keys td {
+  border-bottom-color: #2e2e36;
+}
+
+.guide b,
+.guide strong {
+  color: var(--wow-gold);
+  font-weight: 400;
+}

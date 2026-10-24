@@ -63,6 +63,12 @@ export function Title({ phase, dragging, onPick }: TitleProps) {
                 label: 'ENTER THE RING',
                 icon: GLYPHS.folder,
                 lit: true,
+                tip: [
+                  { left: 'Enter the Ring', kind: 'name', hue: 'legendary' },
+                  { left: 'Unique' },
+                  { left: 'Use: Choose your World of Warcraft folder. The fighters, their gear, the arenas and the sounds are read from it here in the browser.', hue: 'green' },
+                  { left: '"Your game files never leave your computer."', hue: 'gold' },
+                ],
                 input: (
                   <input
                     type="file"
@@ -73,9 +79,37 @@ export function Title({ phase, dragging, onPick }: TitleProps) {
                   />
                 ),
               },
-              { key: '2', label: 'HOW TO PLAY', icon: GLYPHS.swords, onClick: () => setGuide('play') },
-              { key: '3', label: 'YOUR CHAMPION', icon: GLYPHS.champion, onClick: () => setGuide('champion') },
-              { key: '4', label: 'SOURCE', icon: GLYPHS.code, href: SOURCE },
+              {
+                key: '2',
+                label: 'HOW TO PLAY',
+                icon: GLYPHS.swords,
+                onClick: () => setGuide('play'),
+                tip: [
+                  { left: 'How to Play', kind: 'name', hue: 'rare' },
+                  { left: 'Use: The keys for both players, the action bar and how a round is won.', hue: 'green' },
+                ],
+              },
+              {
+                key: '3',
+                label: 'YOUR CHAMPION',
+                icon: GLYPHS.champion,
+                onClick: () => setGuide('champion'),
+                tip: [
+                  { left: 'Your Champion', kind: 'name', hue: 'epic' },
+                  { left: 'Soulbound' },
+                  { left: 'Use: Bring your own characters into the ring with the Mogshot addon.', hue: 'green' },
+                ],
+              },
+              {
+                key: '4',
+                label: 'SOURCE',
+                icon: GLYPHS.code,
+                href: SOURCE,
+                tip: [
+                  { left: 'Source', kind: 'name', hue: 'uncommon' },
+                  { left: 'Use: Read how the game is made, on GitHub.', hue: 'green' },
+                ],
+              },
             ]}
           />
           <p class="hint">

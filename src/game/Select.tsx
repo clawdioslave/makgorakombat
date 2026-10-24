@@ -8,6 +8,12 @@ import { Preview } from './Preview';
 import { championTiles, classesOf, cycleClass, factionOf, gridMove, randomTile, rosterTiles, sexFor, type Tile } from './roster';
 import { Guide, type GuidePage } from './Guide';
 import { LogoArt } from './Title';
+import { kitSpec, type ResourceKind } from '../engine/abilities';
+import { HP } from '../engine/stage';
+import { describeAbility } from './ui/describe';
+import type { Line, Quality } from './ui/WowTooltip';
+
+const RESOURCE_WORDS: Record<ResourceKind, string> = { rage: 'Rage: builds in combat', energy: '+100 Energy', mana: '+100 Mana', focus: '+100 Focus', runic: 'Runic Power: builds in combat', fury: 'Fury: builds in combat' };
 
 /*
  * CHOOSE YOUR CHAMPION. Every race on a grid of the game's own portraits, the player's own
@@ -375,28 +381,71 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
     );
   };
 
+  /** The quality a tile's name and border are drawn in: legends legendary, your own epic, the races rare. */
+  const qualityOf = (tile: Tile | undefined): Quality => (tile?.kind === 'legend' ? 'legendary' : tile?.kind === 'record' ? 'epic' : tile?.kind === 'race' ? 'rare' : 'common');
+
+  /** Each player's plate reads as the champion's tooltip, the way an item lists itself in a bag. */
   const plate = (who: 0 | 1) => {
     const player = players[who];
     const tile = tileAt(player.cursor);
     const champion = player.champion;
-    const classKey = classes.find((c) => c.id === (champion?.classId ?? player.classId))?.key;
+    const classId = champion?.classId ?? (tile?.kind === 'legend' ? tile.legend.classId : player.classId);
+    const classEntry = classes.find((c) => c.id === classId);
+    const classIcon = classEntry && portraits.classes.get(classEntry.key);
+    const lines: Line[] = [];
+    if (tile) {
+      lines.push({ left: tile.kind === 'random' ? 'Random Champion' : nameOf(tile), kind: 'name', hue: qualityOf(tile) });
+      if (tile.kind === 'legend') lines.push({ left: 'Unique' });
+      if (tile.kind === 'record') lines.push({ left: 'Soulbound' });
+    }
+    if (tile && tile.kind !== 'random') {
+      const raceName = tile.kind === 'legend' ? (tile.race?.name ?? '') : tile.race.name;
+      const sex = tile.kind === 'race' ? (sexFor(tile.race, player.sex) === 1 ? ' ♀' : ' ♂') : '';
+      lines.push({
+        left: `${raceName}${sex}`,
+        right: (
+          <>
+            {classIcon && <img class="class" src={classIcon} alt="" />}
+            {kitSpec(classId, player.built?.result.wielding ?? 'oneHand').className === 'CHAMPION' ? 'Champion' : (classEntry?.name ?? '')}
+          </>
+        ),
+      });
+      const weapon = player.built?.moves.weapon;
+      if (weapon) {
+        const speed = weapon.speed / 60;
+        lines.push({ left: `${weapon.damage} Damage`, right: `Speed ${speed.toFixed(2)}` });
+        lines.push({ left: `(${(weapon.damage / speed).toFixed(1)} damage per second)` });
+      }
+      const kit = kitSpec(classId, player.built?.result.wielding ?? 'oneHand');
+      lines.push({ left: `+${HP} Health` }, { left: `${RESOURCE_WORDS[kit.resource]}` });
+      for (const ability of kit.abilities) {
+        const tip = describeAbility(ability, kit.resource);
+        lines.push({ left: `Use: ${ability.name}`, right: [tip.cost, tip.cooldown].filter(Boolean).join(', ') || tip.cast, hue: 'green', rightHue: 'grey' });
+      }
+      const faction = factionOf(tile);
+      if (faction === 'alliance' || faction === 'horde') lines.push({ left: faction === 'alliance' ? 'Alliance' : 'Horde', hue: faction });
+      if (tile.kind === 'legend') lines.push({ kind: 'gap' }, { left: `"${tile.legend.title}"`, hue: 'gold' });
+    } else if (tile?.kind === 'random') {
+      lines.push({ left: 'A champion is picked for you.', hue: 'gold' });
+    }
+    if (player.building && !player.built) lines.push({ left: BRAND.summoning, hue: 'grey', kind: 'small' });
+    if (player.error) lines.push({ left: player.error, hue: 'red', kind: 'small' });
+    const missing = player.built ? missingPieces(player.built.result.scene.problems) : [];
+    if (missing.length > 0) lines.push({ left: `${missing.length} piece(s) not in this install: ${missing[0]}`, hue: 'red', kind: 'small' });
     return (
-      <div class={`plate ${who === 0 ? 'p1' : 'p2'} ${player.locked ? 'locked' : ''}`}>
+      <div class={`plate wow-tooltip ${who === 0 ? 'p1' : 'p2'} ${player.locked ? 'locked' : ''}`}>
         <div class="who">{who === 0 ? 'PLAYER 1' : p2 === 'cpu' ? 'COMPUTER' : p2 === 'gamepad' ? 'PLAYER 2 · PAD' : 'PLAYER 2'}</div>
-        <div class="name">{champion?.name ?? (tile ? nameOf(tile).toUpperCase() : '')}</div>
-        <div class="title">
-          {classKey && portraits.classes.get(classKey) && <img class="class" src={portraits.classes.get(classKey)} alt="" />}
-          {champion?.title ?? (tile?.kind === 'legend' ? tile.legend.title.toUpperCase() : '')}
-          {tile?.kind === 'race' && <span class="sex">{sexFor(tile.race, player.sex) === 1 ? ' ♀' : ' ♂'}</span>}
-        </div>
-        {player.building && !player.built && <div class="status">{BRAND.summoning}</div>}
-        {player.error && <div class="status bad">{player.error}</div>}
-        {player.locked && <div class="stamp">{BRAND.chosen}</div>}
-        {player.built && missingPieces(player.built.result.scene.problems).length > 0 && (
-          <div class="status dim small" title={player.built.result.scene.problems.join('\n')}>
-            {missingPieces(player.built.result.scene.problems).length} piece(s) not in this install: {missingPieces(player.built.result.scene.problems)[0]}
-          </div>
+        {lines.map((line, i) =>
+          line.kind === 'gap' ? (
+            <div class="tt-gap" key={i} />
+          ) : (
+            <div class={`line ${line.kind ? `tt-${line.kind}` : ''} h-${line.hue ?? 'white'}`} key={i}>
+              <span class="l">{line.left}</span>
+              {line.right !== undefined && <span class={`r h-${line.rightHue ?? line.hue ?? 'white'}`}>{line.right}</span>}
+            </div>
+          ),
         )}
+        {player.locked && <div class="stamp">{BRAND.chosen}</div>}
       </div>
     );
   };

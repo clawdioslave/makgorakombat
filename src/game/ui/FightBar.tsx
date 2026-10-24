@@ -4,6 +4,7 @@ import { type InputAction, KEYS, keyLabel } from '../../engine/input';
 import type { Weapon } from '../../engine/moves';
 import type { AbilityView, FighterView } from '../../engine/view';
 import { describeAbility, describeWeapon, type Tooltip } from './describe';
+import { type Line, WowTooltip } from './WowTooltip';
 import { seconds } from './UnitFrame';
 
 /*
@@ -140,23 +141,14 @@ function AbilitySlot({ side, ability, spec, resource, icon, flash, open, onHover
   );
 }
 
-/** The game's tooltip: a dark bevelled box above the slot. */
-function TooltipBox({ tip, why, colour }: { tip: Tooltip; why: string | undefined; colour: string }) {
-  return (
-    <div class="tooltip" style={{ '--power': colour }}>
-      <div class="row">
-        <span class="tip-name">{tip.name}</span>
-        {tip.cost && <span class="tip-cost">{tip.cost}</span>}
-      </div>
-      {tip.range && <div class="row">{tip.range}</div>}
-      <div class="row">
-        <span>{tip.cast}</span>
-        {tip.cooldown && <span>{tip.cooldown}</span>}
-      </div>
-      {tip.description && <div class="desc">{tip.description}</div>}
-      {why && why !== 'NOT NOW' && <div class="why">{why}</div>}
-    </div>
-  );
+/** The game's spell tooltip: name; cost and range; cast time and cooldown; what it does in gold; why not, in red. */
+function TooltipBox({ tip, why }: { tip: Tooltip; why: string | undefined; colour: string }) {
+  const lines: Line[] = [{ left: tip.name, kind: 'name' }];
+  if (tip.cost || tip.range) lines.push({ left: tip.cost, right: tip.range || undefined });
+  lines.push({ left: tip.cast, right: tip.cooldown || undefined });
+  if (tip.description) lines.push({ left: tip.description, hue: 'gold' });
+  if (why && why !== 'NOT NOW') lines.push({ left: why.charAt(0) + why.slice(1).toLowerCase(), hue: 'red' });
+  return <WowTooltip lines={lines} />;
 }
 
 /** The spell's picture, or its short name on the plain slot until the picture arrives. */

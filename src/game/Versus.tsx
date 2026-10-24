@@ -8,6 +8,7 @@ import { CAMERA, START_X } from '../engine/stage';
 import { Arena } from './arena';
 import type { BuiltFighter } from './fighters';
 import { facingRadians, type Ground, type Stage, thumbnailUrl } from './stages';
+import { type Line, WowTooltip } from './ui/WowTooltip';
 
 /*
  * The two champions face each other across the ring while the ground is picked: a stage in the
@@ -26,6 +27,26 @@ interface VersusProps {
 }
 
 type Entry = { kind: 'stage'; stage: Stage } | { kind: 'screen'; screen: LoadingScreen };
+
+/** The stage under the cursor as the game would list it: a place in the world reads epic, a loading screen common. */
+function stageLines(entry: Entry, status: string | undefined): Line[] {
+  if (entry.kind === 'screen') {
+    return [
+      { left: entry.screen.name, kind: 'name', hue: 'common' },
+      { left: 'Loading Screen', right: entry.screen.wide ? 'Widescreen' : 'Classic' },
+      { left: 'Use: Fight before the picture.', hue: 'green' },
+    ];
+  }
+  const { stage } = entry;
+  const lines: Line[] = [
+    { left: stage.name, kind: 'name', hue: 'epic' },
+    { left: 'Arena', right: stage.where },
+    { left: `Use: Fight in the world itself, ${stage.reach} yards of it drawn round the ring.`, hue: 'green' },
+    { left: `"${stage.why}"`, hue: 'gold' },
+  ];
+  if (status) lines.push({ left: status, hue: 'grey', kind: 'small' });
+  return lines;
+}
 
 const STAGE_LIKE = /arena|gurubashi|nagrand|coliseum|colosseum|durotar|orgrimmar|stranglethorn|barrens|valley of trials|ring/i;
 /** How many raised places are kept while the strip is browsed; a place is a few hundred megabytes of world. */
@@ -197,7 +218,8 @@ export function Versus({ client, fighters, stages, screens, onFight, onBack }: V
         <div class="label">CHOOSE THE GROUND · {title}</div>
         <div class="strip">
           {shown.map((entry) => (
-            <div key={keyOf(entry)} class={`stage ${entry.kind === 'stage' ? 'world' : ''} ${entry === here ? 'here' : ''}`} title={entry.kind === 'stage' ? entry.stage.why : entry.screen.name}>
+            <div key={keyOf(entry)} class={`stage ${entry.kind === 'stage' ? 'world' : ''} ${entry === here ? 'here' : ''}`}>
+              {entry === here && <WowTooltip lines={stageLines(entry, status)} />}
               {entry.kind === 'stage' ? (
                 <img src={thumbnailUrl(entry.stage)} alt={entry.stage.name} />
               ) : thumbs.get(entry.screen.fileId) ? (

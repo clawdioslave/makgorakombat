@@ -1,4 +1,5 @@
 import type { ComponentChildren } from 'preact';
+import { type Line, WowTooltip } from './ui/WowTooltip';
 
 /*
  * A row of square slots with gold frames and a hotkey in the corner, as the game's action
@@ -15,6 +16,8 @@ export interface Slot {
   input?: ComponentChildren;
   /** Drawn lit, as an ability off cooldown. */
   lit?: boolean;
+  /** The game's tooltip, shown while the pointer is on the slot. */
+  tip?: readonly Line[];
 }
 
 export function ActionBar({ slots }: { slots: Slot[] }) {
@@ -26,6 +29,7 @@ export function ActionBar({ slots }: { slots: Slot[] }) {
             <span class="hotkey">{slot.key}</span>
             <span class="icon">{slot.icon}</span>
             <span class="label">{slot.label}</span>
+            {slot.tip && <WowTooltip lines={slot.tip} class="hover-tip" />}
           </>
         );
         const cls = `slot ${slot.lit ? 'lit' : ''}`;

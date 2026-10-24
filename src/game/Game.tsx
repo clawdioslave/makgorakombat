@@ -10,6 +10,7 @@ import { pictureUrl } from './pixels';
 import { LEGENDS, legendTiles, type Tile } from './roster';
 import { Select, type Source } from './Select';
 import { Title } from './Title';
+import { loadGameFonts } from './ui/fonts';
 import { FightUi } from './ui/FightUi';
 import { type Stage, stagesFor, type Ground } from './stages';
 import { Versus } from './Versus';
@@ -56,6 +57,7 @@ export function Game() {
     const product = phase.kind === 'ready' ? phase.opened.info.product : '';
     void (async () => {
       try {
+        void loadGameFonts(data);
         const [races, classes, portraits, screens, looks, maps] = await Promise.all([
           data.races(),
           data.classList(),

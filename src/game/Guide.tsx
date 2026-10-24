@@ -1,4 +1,5 @@
 import { useEffect } from 'preact/hooks';
+import { type InputAction, KEY_LABELS, KEYS } from '../engine/input';
 
 /*
  * The guide: how to play, and how to get your own characters into the ring (the Mogshot
@@ -12,6 +13,9 @@ interface GuideProps {
   onPage: (page: GuidePage) => void;
   onClose: () => void;
 }
+
+/** Every key bound to an action, as the action bar labels them: "J", ", or NUM 0". */
+const keys = (player: 0 | 1, action: InputAction) => KEYS[player][action].map((code) => KEY_LABELS[code] ?? code).join(' or ');
 
 const ADDON = 'https://github.com/realworldbuilder/mogshot/tree/main/addon/Mogshot';
 const ADDON_ZIP = 'https://github.com/realworldbuilder/mogshot/archive/refs/heads/main.zip';
@@ -60,12 +64,11 @@ export function Guide({ page, onPage, onClose }: GuideProps) {
                 <tr><th></th><th>Player 1</th><th>Player 2</th></tr>
               </thead>
               <tbody>
-                <tr><td>Move</td><td>A / D</td><td>← / →</td></tr>
-                <tr><td>Jump</td><td>W</td><td>↑</td></tr>
-                <tr><td>Light attack</td><td>J</td><td>, or Numpad 1</td></tr>
-                <tr><td>Heavy attack</td><td>K</td><td>. or Numpad 2</td></tr>
-                <tr><td>Spell</td><td>L</td><td>/ or Numpad 3</td></tr>
-                <tr><td>Block (hold)</td><td>U</td><td>Right Shift or Numpad 0</td></tr>
+                <tr><td>Move</td><td>{keys(0, 'left')} / {keys(0, 'right')}</td><td>{keys(1, 'left')} / {keys(1, 'right')}</td></tr>
+                <tr><td>Jump</td><td>{keys(0, 'jump')}</td><td>{keys(1, 'jump')}</td></tr>
+                <tr><td>Attack (hold to keep swinging)</td><td>{keys(0, 'attack')}</td><td>{keys(1, 'attack')}</td></tr>
+                <tr><td>Abilities, on the action bar</td><td>{keys(0, 'ability1')} · {keys(0, 'ability2')} · {keys(0, 'ability3')}</td><td>{keys(1, 'ability1')} · {keys(1, 'ability2')} · {keys(1, 'ability3')}</td></tr>
+                <tr><td>What an ability does</td><td colSpan={2}>Hover its slot, or hold its key</td></tr>
                 <tr><td>On the roster</td><td>WASD · J choose · H back · U ♂/♀ · K L class</td><td>arrows · , choose · M back · Right Shift ♂/♀ · . / class</td></tr>
               </tbody>
             </table>
