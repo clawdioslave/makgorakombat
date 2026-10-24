@@ -78,9 +78,12 @@ export class InputReader {
   private readonly sources: [InputSource, InputSource] = ['keyboard', 'keyboard'];
   private readonly gamepadIndex: [number | undefined, number | undefined] = [undefined, undefined];
   private target: Target | undefined;
+  /** Keys that went down since the last read, so a tap shorter than a tick still counts. */
+  private readonly tapped = new Set<string>();
   private readonly onKeyDown: Listener = (event) => {
     if (PREVENT.has(event.code)) event.preventDefault();
     if (this.mapped(event.code)) event.preventDefault();
+    if (!event.repeat && !this.down.has(event.code)) this.tapped.add(event.code);
     this.down.add(event.code);
   };
   private readonly onKeyUp: Listener = (event) => {
@@ -124,6 +127,7 @@ export class InputReader {
 
   /** Feed a key by hand, for tests or on-screen buttons. */
   press(code: string): void {
+    if (!this.down.has(code)) this.tapped.add(code);
     this.down.add(code);
   }
 
@@ -132,7 +136,9 @@ export class InputReader {
   }
 
   read(match?: Match): [Inputs, Inputs] {
-    return [this.readPlayer(0, match), this.readPlayer(1, match)];
+    const out: [Inputs, Inputs] = [this.readPlayer(0, match), this.readPlayer(1, match)];
+    this.tapped.clear();
+    return out;
   }
 
   private mapped(code: string): boolean {
@@ -150,6 +156,11 @@ export class InputReader {
     const out = noInputs();
     for (const action of ACTIONS) {
       out[action] = EDGE.includes(action) ? held[action] && !previous[action] : held[action];
+    }
+    // A key pressed and released between two reads is an edge too: it was never seen held.
+    if (source !== 'gamepad') {
+      const map = KEYS[player];
+      for (const action of EDGE) if (!out[action] && map[action].some((code) => this.tapped.has(code))) out[action] = true;
     }
     this.previous[player] = held;
     return out;
