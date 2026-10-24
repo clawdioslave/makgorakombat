@@ -1,14 +1,13 @@
-import { GCD_FRAMES, MAX_RESOURCE, RESOURCE_COLOURS, RESOURCE_NAMES } from '../engine/abilities';
 import { BRAND } from '../engine/brand';
-import { abilityBlocked, type FloatingText, type Match } from '../engine/engine';
-import { type InputAction, keyLabel } from '../engine/input';
+import type { FloatingText, Match } from '../engine/engine';
 import { HALF, HP, ROUND_FRAMES } from '../engine/stage';
 
 /*
- * What is drawn over the ring: the bars, the clock, the round pips, the words that slam in,
- * each fighter's action bar with its cooldowns, the nameplates with their cast bars, the
- * numbers and words that float off a hit, the ground line, the hit sparks and the spells in
- * flight. Plain 2D canvas, redrawn each frame.
+ * What is drawn over the ring and belongs to the world: the ground line, the nameplates with
+ * their slivers of health, cast bars and stun stars, the hit sparks, the spells in flight, the
+ * numbers and words that float off a hit, and the words that slam in (ROUND 1, FIGHT!, K.O.).
+ * The unit frames, action bars and clock are the DOM layer's (ui/FightUi.tsx). Plain 2D canvas,
+ * redrawn each frame.
  */
 
 export type Project = (point: readonly [number, number, number]) => [number, number] | undefined;
@@ -19,8 +18,6 @@ const GOLD = '#ffd100';
 const BONE = '#f4f1e6';
 /** Where a nameplate sits: this far above the feet. */
 const HEAD = 2.3;
-
-const ABILITY_KEYS: readonly InputAction[] = ['ability1', 'ability2', 'ability3'];
 
 export interface HudOptions {
   /** Which fighters a person plays: a blow they take floats red, as the game shows damage taken. Both by default. */
@@ -44,34 +41,12 @@ export function drawHud(ctx: CanvasRenderingContext2D, width: number, height: nu
   };
 
   groundLine(ctx, at);
-  healthBars(ctx, w, match, names);
-  clock(ctx, w, match);
   nameplates(ctx, match, names, at);
   sparks(ctx, match, at);
   projectiles(ctx, match, at);
   floatingTexts(ctx, match, at, human);
-  actionBars(ctx, w, h, match);
   banner(ctx, w, h, match);
 
-  if (match.phase === 'intro' && match.round === 1) {
-    ctx.font = `700 13px ${SERIF}`;
-    ctx.fillStyle = 'rgba(244, 241, 230, 0.8)';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    const keys = (p: 0 | 1) => ABILITY_KEYS.map((a) => keyLabel(p, a)).join(' ');
-    ctx.fillText(
-      `P1  ${keyLabel(0, 'left')} ${keyLabel(0, 'right')} move · ${keyLabel(0, 'jump')} jump · ${keyLabel(0, 'attack')} attack · ${keys(0)} abilities        P2  ${keyLabel(1, 'left')} ${keyLabel(1, 'right')} · ${keyLabel(1, 'jump')} · ${keyLabel(1, 'attack')} attack · ${keys(1)} abilities`,
-      w / 2,
-      h - 100,
-    );
-  }
-  if (match.phase === 'matchEnd') {
-    ctx.font = `700 22px ${SERIF}`;
-    ctx.fillStyle = GOLD;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('ENTER  rematch        ESC  new champions', w / 2, h - 110);
-  }
   if (debug) {
     ctx.font = '12px monospace';
     ctx.fillStyle = '#7bd88f';
@@ -97,94 +72,6 @@ function groundLine(ctx: CanvasRenderingContext2D, at: (p: readonly [number, num
   ctx.moveTo(left[0], left[1] + 2);
   ctx.lineTo(right[0], right[1] + 2);
   ctx.stroke();
-}
-
-/** Health bars drain toward the middle from each side; the class resource runs under each, in its colour. */
-function healthBars(ctx: CanvasRenderingContext2D, w: number, match: Match, names: [string, string]): void {
-  const barWidth = w * 0.4;
-  const barHeight = 26;
-  const top = 28;
-  match.fighters.forEach((fighter, i) => {
-    const kit = match.tables[i]!.kit;
-    const x0 = i === 0 ? 40 : w - 40 - barWidth;
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(x0 - 3, top - 3, barWidth + 6, barHeight + 6 + 14);
-    const trail = Math.max(0, Math.min(1, fighter.shownHp / HP));
-    const life = Math.max(0, Math.min(1, fighter.hp / HP));
-    const fill = (share: number, colour: string, y: number, height: number, from = 0) => {
-      ctx.fillStyle = colour;
-      const length = barWidth * share;
-      const start = barWidth * from;
-      // What is left stays at the outer edge; damage eats the bar from the middle of the screen.
-      ctx.fillRect(i === 0 ? x0 + start : x0 + barWidth - start - length, y, length, height);
-    };
-    fill(1, '#3a0c0c', top, barHeight);
-    fill(trail, BONE, top, barHeight);
-    fill(life, life > 0.3 ? '#c8121c' : '#ff5a2a', top, barHeight);
-    // A shield's absorb sits past the health, white.
-    if (fighter.absorb > 0) fill(Math.min(1 - life, fighter.absorb / HP), 'rgba(244, 241, 230, 0.75)', top, barHeight, life);
-    ctx.strokeStyle = GOLD;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x0, top, barWidth, barHeight);
-    // The health as a number.
-    ctx.font = `700 14px ${SERIF}`;
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = i === 0 ? 'right' : 'left';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-    const hpText = `${Math.ceil(fighter.hp)} / ${HP}`;
-    ctx.strokeText(hpText, i === 0 ? x0 + barWidth - 8 : x0 + 8, top + barHeight / 2 + 1);
-    ctx.fillStyle = BONE;
-    ctx.fillText(hpText, i === 0 ? x0 + barWidth - 8 : x0 + 8, top + barHeight / 2 + 1);
-    // The resource.
-    const ry = top + barHeight + 4;
-    fill(1, '#14110f', ry, 10);
-    fill(Math.max(0, Math.min(1, fighter.resource / MAX_RESOURCE)), RESOURCE_COLOURS[kit.resource], ry, 10);
-    ctx.strokeStyle = 'rgba(255, 209, 0, 0.6)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x0, ry, barWidth, 10);
-    ctx.fillStyle = BONE;
-    ctx.font = `700 11px ${SERIF}`;
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = i === 0 ? 'right' : 'left';
-    ctx.fillText(`${Math.floor(fighter.resource)} ${RESOURCE_NAMES[kit.resource]}`, i === 0 ? x0 + barWidth - 6 : x0 + 6, ry + 5);
-    // The name and class, and a pip for each round won.
-    ctx.fillStyle = GOLD;
-    ctx.font = `700 18px ${SERIF}`;
-    ctx.textBaseline = 'top';
-    ctx.textAlign = i === 0 ? 'left' : 'right';
-    ctx.fillText(names[i]!, i === 0 ? x0 : x0 + barWidth, ry + 18);
-    ctx.font = `700 11px ${SERIF}`;
-    ctx.fillStyle = 'rgba(244, 241, 230, 0.75)';
-    ctx.fillText(kit.className, i === 0 ? x0 : x0 + barWidth, ry + 40);
-    for (let pip = 0; pip < 2; pip++) {
-      const cx = i === 0 ? x0 + barWidth - 14 - pip * 24 : x0 + 14 + pip * 24;
-      ctx.beginPath();
-      ctx.arc(cx, ry + 28, 7, 0, Math.PI * 2);
-      ctx.fillStyle = pip < fighter.wins ? GOLD : 'rgba(0,0,0,0.5)';
-      ctx.fill();
-      ctx.strokeStyle = GOLD;
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
-  });
-}
-
-function clock(ctx: CanvasRenderingContext2D, w: number, match: Match): void {
-  const top = 28;
-  const seconds = Math.max(0, Math.ceil(match.timer / 60));
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  ctx.font = `48px ${HEAVY}`;
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = '#1a0606';
-  ctx.strokeText(String(seconds), w / 2, top - 6);
-  ctx.fillStyle = seconds <= 10 ? '#ff5a2a' : BONE;
-  ctx.fillText(String(seconds), w / 2, top - 6);
-  ctx.font = `700 13px ${SERIF}`;
-  ctx.fillStyle = GOLD;
-  ctx.fillText(BRAND.round(match.round), w / 2, top + 48);
-  ctx.fillText(`${match.fighters[0].wins} – ${match.fighters[1].wins}`, w / 2, top + 66);
 }
 
 /** A thin plate over each head: the name, a sliver of health, the cast bar while casting, stars while stunned. */
@@ -393,93 +280,6 @@ function floatingTexts(ctx: CanvasRenderingContext2D, match: Match, at: (p: read
     ctx.fillText(text.text, 0, 0);
     ctx.restore();
   }
-}
-
-/** Each fighter's abilities as a row of slots: name, key, cooldown sweep, dimmed when they cannot go. */
-function actionBars(ctx: CanvasRenderingContext2D, w: number, h: number, match: Match): void {
-  const size = 68;
-  const gap = 6;
-  const bottom = h - 22;
-  match.fighters.forEach((fighter, i) => {
-    const kit = match.tables[i]!.kit;
-    const rowWidth = size * kit.abilities.length + gap * (kit.abilities.length - 1);
-    const x0 = i === 0 ? 40 : w - 40 - rowWidth;
-    kit.abilities.forEach((ability, n) => {
-      const x = x0 + n * (size + gap);
-      const y = bottom - size;
-      const inUse = fighter.ability === n && (fighter.state === 'ability' || fighter.state === 'cast' || fighter.state === 'dash');
-      const why = match.phase === 'fight' || match.phase === 'finish' ? abilityBlocked(match, i as 0 | 1, n) : undefined;
-      const cooling = fighter.cooldowns[n]! > 0;
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(x, y, size, size);
-      ctx.fillStyle = why === 'OUT OF RANGE' || why === 'TOO CLOSE' ? 'rgba(90, 60, 30, 0.6)' : 'rgba(60, 30, 20, 0.7)';
-      ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
-      // The name, on one or two lines, shrunk until it fits the slot.
-      const lines = ability.short.split(' ');
-      let px = lines.length > 1 ? 11 : 12;
-      ctx.font = `700 ${px}px ${SERIF}`;
-      while (px > 8 && lines.some((line) => ctx.measureText(line).width > size - 8)) ctx.font = `700 ${--px}px ${SERIF}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = why && why.startsWith('NOT ENOUGH') ? '#ff6a6a' : why === 'NEEDS 20% HEALTH' ? '#8a8a8a' : BONE;
-      if (why === 'OUT OF RANGE' || why === 'TOO CLOSE') ctx.fillStyle = '#c9b48a';
-      lines.forEach((line, k) => ctx.fillText(line, x + size / 2, y + size / 2 + (k - (lines.length - 1) / 2) * 13));
-      // The cooldown sweep, clockwise from the top, with the seconds left.
-      const sweep = cooling ? fighter.cooldowns[n]! / Math.max(1, ability.cooldown) : ability.gcd && fighter.gcd > 0 ? fighter.gcd / GCD_FRAMES : 0;
-      if (sweep > 0) {
-        ctx.fillStyle = cooling ? 'rgba(0,0,0,0.72)' : 'rgba(0,0,0,0.4)';
-        ctx.beginPath();
-        ctx.moveTo(x + size / 2, y + size / 2);
-        ctx.arc(x + size / 2, y + size / 2, size, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * sweep, false);
-        ctx.closePath();
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(x, y, size, size);
-        ctx.clip();
-        ctx.fill();
-        ctx.restore();
-        if (cooling) {
-          const seconds = fighter.cooldowns[n]! / 60;
-          ctx.font = `22px ${HEAVY}`;
-          ctx.fillStyle = BONE;
-          ctx.lineWidth = 4;
-          ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-          const label = seconds >= 10 ? String(Math.ceil(seconds)) : seconds.toFixed(1);
-          ctx.strokeText(label, x + size / 2, y + size / 2);
-          ctx.fillText(label, x + size / 2, y + size / 2);
-        }
-      }
-      // The key, in the corner; the cost at the bottom.
-      ctx.font = `700 10px ${SERIF}`;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillStyle = GOLD;
-      ctx.fillText(keyLabel(i as 0 | 1, ABILITY_KEYS[n]!), x + 4, y + 3);
-      if (ability.cost > 0) {
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'bottom';
-        ctx.fillStyle = RESOURCE_COLOURS[kit.resource];
-        ctx.fillText(String(ability.cost), x + size - 4, y + size - 3);
-      }
-      if (ability.cast > 0) {
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'bottom';
-        ctx.fillStyle = 'rgba(244, 241, 230, 0.7)';
-        ctx.fillText(`${(ability.cast / 60).toFixed(1)}s`, x + 4, y + size - 3);
-      }
-      ctx.strokeStyle = inUse ? BONE : GOLD;
-      ctx.lineWidth = inUse ? 3 : 1.5;
-      ctx.strokeRect(x + 1, y + 1, size - 2, size - 2);
-    });
-    // The auto-attack: a small swing-timer bar beside the row.
-    const sx = i === 0 ? x0 + rowWidth + 10 : x0 - 18;
-    const speed = match.tables[i]!.weapon.speed;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(sx, bottom - size, 8, size);
-    const ready = 1 - fighter.swingT / Math.max(1, speed);
-    ctx.fillStyle = fighter.auto || fighter.queued ? '#ffd100' : 'rgba(244, 241, 230, 0.5)';
-    ctx.fillRect(sx + 1, bottom - 1 - (size - 2) * ready, 6, (size - 2) * ready);
-  });
 }
 
 /** The words: ROUND 1, FIGHT!, FINISH THE MAK'GORA!, K.O., DISHONOR! */
