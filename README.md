@@ -11,7 +11,7 @@ Play: https://realworldbuilder.github.io/makgorakombat/
 1. Drag your `World of Warcraft` folder onto the page (it is in `Applications` on a Mac). Chrome on a Mac is what it is made for.
 2. **CHOOSE YOUR CHAMPION.** Every race the game lets you create is on the grid, in the game's own portraits; your own characters, as captured by the [Mogshot addon](https://github.com/realworldbuilder/mogshot/tree/main/addon/Mogshot), are in the row above with their real gear; above those, the **LEGENDS**: Tyrande, Thrall, Sylvanas, Malfurion, Illidan, Varian, Cairne and Vol'jin, drawn exactly as the game draws them (the NPC's own gear, face and painted body), as far as your install has them. Both players' cursors are on the grid at once. Resting on a tile summons that champion full size on your side; choosing makes them roar.
 3. The **VS** screen: pick the ground. The stages are real places in the game world, read from the open folder's map files and raised around the fighters while they wait: Gurubashi Arena's pit, the ring of totems in the Valley of Trials, the Crossroads, the Valley of Heroes, Goldshire's lawn, Sentinel Hill, the gardens of Darnassus, Thunder Bluff's rise, and on a retail install Dalaran and the gate of Icecrown. The strip shows the stages the open install has maps for; past them are the game's loading screens, flat pictures behind the ring, for installs that lack a map.
-4. Best of three rounds, sixty seconds each. Take the other champion's health to nothing and they are dazed: **FINISH THE MAK'GORA!** An ability that lands then is **DISHONOR!**; a round won untouched is **HONOR RESTORED**.
+4. Best of three rounds, sixty seconds each. Take the other champion's health to nothing and they are dazed: **FINISH THE MAK'GORA!** You have four seconds. Enter your class's **fatality** sequence (it is shown on your side of the screen) and the execution plays; an ability that lands without it is the plain finisher; either is **DISHONOR!** A swing, or the clock, is a mere **K.O.** A round won untouched is **HONOR RESTORED**.
 
 ### The fight is World of Warcraft's
 
@@ -36,6 +36,28 @@ Each class has **three abilities** on the action bar beside the auto-attack, on 
 | Evoker (mana) | Living Flame: 1.5 s cast, 16 damage | Fire Breath: 20 damage and burns, 12 s | Hover: leaps back, 15 s |
 
 Every move is one of the character's own animations: Ready stances by weapon, Attack swings with all their variations, the class's own casts (MagSpellCastBothFront, PriSpellCastBothUp, ShaSpellCastBothFront...), CombatChargeLoop and CombatChargeEnd, CombatExecute, Stormstrike, DeathStrike, FelRush, DHBladeDance, RisingSunKick, Dodge and Parry, battle roars, cheers, combat wounds, stuns, knockdowns and deaths, as the game plays them, with a plain strike or cast standing in where a model lacks one.
+
+### Fatalities
+
+Under FINISH THE MAK'GORA! the winner's keys are read as a sequence. The prompt on the winner's side shows the fatality's name and a slot per key: a lit slot is a key landed, the ring around the next counts its 1.5 s down, and the bar under them is the four-second window. A wrong key empties the slots and locks them for half a second (a direction before the first key is just walking). The attack and ability keys the sequence takes fire nothing; one it refuses fires as usual. The computer enters its own sequence too, and fumbles a key now and then. **Back** and **forward** are relative to the way your champion faces: for player 1 facing right, back is A and forward is D; for player 2 facing left, back is → and forward is ←. The ability keys are K L U for player 1, . / Right Shift for player 2, A B X on a pad; attack is J, , or the right trigger.
+
+| Class | Fatality | Sequence | The scene |
+|---|---|---|---|
+| Warrior | Bladestorm | back, forward, back, ability 2 | charges in, spins through them (CombatBladeStorm), they kneel, the execute |
+| Paladin | Hammer of Wrath | forward, forward, ability 2, attack | a pillar of light, a hammer blow that floors them, the execute |
+| Hunter | Rapid Fire | back, back, ability 1, attack | leaps back, a volley of arrows, the kill shot |
+| Rogue | Eviscerate | back, forward, ability 1, ability 1, attack | steps behind them, two strikes, the eviscerate |
+| Priest | Shadow Word: Death | back, back, ability 2, ability 1 | shadow gathers, a channel that wracks them, the word |
+| Death Knight | Soul Reaper | forward, back, ability 2, attack | a death grip drags them in, a frost strike, the reap |
+| Shaman | Thunderstorm | back, forward, ability 1, ability 2 | lightning from the sky twice, a charge, Stormstrike |
+| Mage | Deep Freeze | back, back, forward, ability 1 | frost grows over them, a frozen beat, the shatter |
+| Warlock | Drain Soul | forward, back, ability 2, ability 1 | shadow, a long drain, the burst |
+| Monk | Touch of Death | forward, forward, attack, ability 1 | a flying kick, a roundhouse, the touch |
+| Druid | Starfall | back, forward, ability 2, ability 1 | moonlight, stars that fall on them, the last star |
+| Demon Hunter | Eye Beam | back, forward, forward, ability 3 | Fel Rush, Blade Dance, a hop back and the beam |
+| Evoker | Deep Breath | back, back, ability 2, attack | takes to the air, a breath of fire, the last breath |
+
+Each beat is one of the winner's own animations (CombatBladeStorm, CombatExecute, CombatEviscerate, DeathStrike, Stormstrike, PalmStrike, DHBladeDance1, BreathOfFire, the class casts and channels...) with a plain strike or cast standing in where the model lacks one, and the loser's Stun, Cower, CombatCritical, Knockdown and Death. The scene runs in slow motion with the camera pushed in, letterboxed, with the class's effect drawn over the pair, and ends under **DISHONOR!** with the fatality's name. A legend without a class plays the warrior's, or the hunter's behind a bow.
 
 ### Controls
 

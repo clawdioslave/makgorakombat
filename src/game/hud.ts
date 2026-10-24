@@ -552,7 +552,8 @@ function effect(ctx: CanvasRenderingContext2D, w: number, h: number, kind: Fatal
     ctx.stroke();
   };
   ctx.save();
-  ctx.globalCompositeOperation = kind === 'blood' ? 'source-over' : 'lighter';
+  // Light adds up; blood and ice are things, drawn over the scene.
+  ctx.globalCompositeOperation = kind === 'blood' || kind === 'frost' || kind === 'shatter' ? 'source-over' : 'lighter';
   ctx.lineCap = 'round';
   switch (kind) {
     case 'shockwave': {
@@ -598,11 +599,13 @@ function effect(ctx: CanvasRenderingContext2D, w: number, h: number, kind: Fatal
       const grow = kind === 'frost' ? Math.min(1, s * 1.5) : 1;
       const fly = kind === 'shatter' ? s : 0;
       const [cx, cy] = p.loser;
-      disc(cx, cy, 110 * grow, rgba(0.5 * (1 - fly)), rgba(0));
-      for (let i = 0; i < 12; i++) {
-        const a = (i / 12) * Math.PI * 2 + jitter(i) * 0.4;
-        const len = (40 + 70 * jitter(i + 5)) * grow;
-        const base = 10 + 8 * jitter(i + 9);
+      ctx.globalCompositeOperation = 'lighter';
+      disc(cx, cy, 120 * grow, rgba(0.45 * (1 - fly)), rgba(0));
+      ctx.globalCompositeOperation = 'source-over';
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * Math.PI * 2 + jitter(i) * 0.4;
+        const len = (60 + 90 * jitter(i + 5)) * grow;
+        const base = 14 + 10 * jitter(i + 9);
         const off = fly * 260 * (0.6 + jitter(i + 3));
         const ox = cx + Math.cos(a) * off;
         const oy = cy + Math.sin(a) * off + fly * fly * 300;
@@ -610,9 +613,12 @@ function effect(ctx: CanvasRenderingContext2D, w: number, h: number, kind: Fatal
         const ty = oy + Math.sin(a) * len;
         const nx = -Math.sin(a) * base / 2;
         const ny = Math.cos(a) * base / 2;
-        ctx.fillStyle = `rgba(230, 248, 255, ${0.85 * (1 - fly)})`;
-        ctx.strokeStyle = rgba(0.9 * (1 - fly));
-        ctx.lineWidth = 1.5;
+        const ice = ctx.createLinearGradient(ox, oy, tx, ty);
+        ice.addColorStop(0, `rgba(200, 236, 255, ${0.95 * (1 - fly)})`);
+        ice.addColorStop(1, `rgba(255, 255, 255, ${0.6 * (1 - fly)})`);
+        ctx.fillStyle = ice;
+        ctx.strokeStyle = `rgba(40, 110, 190, ${0.9 * (1 - fly)})`;
+        ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(tx, ty);
         ctx.lineTo(ox + nx, oy + ny);
@@ -658,16 +664,18 @@ function effect(ctx: CanvasRenderingContext2D, w: number, h: number, kind: Fatal
     }
     case 'blood': {
       const [cx, cy] = p.loser;
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < 24; i++) {
         const t = s - jitter(i + 1) * 0.5;
         if (t < 0) continue;
         const a = -Math.PI / 2 + (jitter(i + 7) - 0.5) * 2.4;
-        const v = 160 + 240 * jitter(i + 13);
+        const v = 160 + 260 * jitter(i + 13);
         const x = cx + Math.cos(a) * v * t;
         const y = cy + Math.sin(a) * v * t + 900 * t * t;
-        ctx.fillStyle = `rgba(190, 10, 20, ${Math.max(0, 1 - t * 1.6)})`;
+        const r = 4 + 6 * jitter(i + 2);
+        ctx.fillStyle = `rgba(170, 8, 18, ${Math.max(0, 1 - t * 1.5)})`;
         ctx.beginPath();
-        ctx.arc(x, y, 3 + 4 * jitter(i + 2), 0, Math.PI * 2);
+        // A drop: round, drawn out along its flight.
+        ctx.ellipse(x, y, r, r * 1.6, a + Math.PI / 2, 0, Math.PI * 2);
         ctx.fill();
       }
       break;
