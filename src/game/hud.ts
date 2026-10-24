@@ -338,7 +338,7 @@ function floatingTexts(ctx: CanvasRenderingContext2D, match: Match, at: (p: read
 
 /** Each fighter's four abilities as a row of slots: name, key, cooldown sweep, dimmed when they cannot go. */
 function actionBars(ctx: CanvasRenderingContext2D, w: number, h: number, match: Match): void {
-  const size = 64;
+  const size = 68;
   const gap = 6;
   const bottom = h - 22;
   match.fighters.forEach((fighter, i) => {
@@ -355,9 +355,11 @@ function actionBars(ctx: CanvasRenderingContext2D, w: number, h: number, match: 
       ctx.fillRect(x, y, size, size);
       ctx.fillStyle = why === 'OUT OF RANGE' || why === 'TOO CLOSE' ? 'rgba(90, 60, 30, 0.6)' : 'rgba(60, 30, 20, 0.7)';
       ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
-      // The name, on one or two lines.
+      // The name, on one or two lines, shrunk until it fits the slot.
       const lines = ability.short.split(' ');
-      ctx.font = `700 ${lines.length > 1 ? 11 : 12}px ${SERIF}`;
+      let px = lines.length > 1 ? 11 : 12;
+      ctx.font = `700 ${px}px ${SERIF}`;
+      while (px > 8 && lines.some((line) => ctx.measureText(line).width > size - 8)) ctx.font = `700 ${--px}px ${SERIF}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = why && why.startsWith('NOT ENOUGH') ? '#ff6a6a' : why === 'NEEDS 20% HEALTH' ? '#8a8a8a' : BONE;

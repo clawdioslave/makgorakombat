@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { cpuInputs } from '../engine/cpu';
 import { type Inputs, type Match, newMatch, poseOf, tick } from '../engine/engine';
 import { InputReader } from '../engine/input';
 import { type MoveTable, resolveMoves } from '../engine/moves';
@@ -85,8 +84,8 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
       let steps = 0;
       const t0 = performance.now();
       while (owed >= TICK_MS && steps < MAX_STEPS) {
+        // The reader asks the CPU itself when player 2 is the computer; asking twice would lose its presses.
         const inputs: [Inputs, Inputs] = input.read(current);
-        if (p2 === 'cpu') inputs[1] = cpuInputs(current, 1);
         tick(current, inputs);
         owed -= TICK_MS;
         steps++;
