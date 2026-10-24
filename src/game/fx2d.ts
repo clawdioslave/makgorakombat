@@ -155,25 +155,31 @@ function lightning(ctx: CanvasRenderingContext2D, a: Screen, b: Screen, seed: nu
   }
 }
 
-/** A tapered streak from `tail` (thin, faded) to `head` (full width), as a filled quad with a gradient. */
+/**
+ * A tapered streak from `tail` (a point, faded) to `head` (`width` across, bright), soft-edged:
+ * three tapers laid over one another, wide and faint to narrow and hot, the head rounded off.
+ */
 function streak(ctx: CanvasRenderingContext2D, tail: Screen, head: Screen, width: number, rgb: string, alpha: number): void {
   const dx = head[0] - tail[0];
   const dy = head[1] - tail[1];
   const length = Math.hypot(dx, dy);
   if (length < 1 || alpha <= 0) return;
-  const nx = (-dy / length) * width * 0.5;
-  const ny = (dx / length) * width * 0.5;
-  const g = ctx.createLinearGradient(tail[0], tail[1], head[0], head[1]);
-  g.addColorStop(0, rgba(rgb, 0));
-  g.addColorStop(0.7, rgba(rgb, alpha * 0.6));
-  g.addColorStop(1, rgba('255, 255, 240', alpha));
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.moveTo(tail[0], tail[1]);
-  ctx.lineTo(head[0] + nx, head[1] + ny);
-  ctx.lineTo(head[0] - nx, head[1] - ny);
-  ctx.closePath();
-  ctx.fill();
+  for (const [w, a, hot] of [[1, 0.3, false], [0.55, 0.5, false], [0.2, 0.9, true]] as const) {
+    const half = (width * w) / 2;
+    const nx = (-dy / length) * half;
+    const ny = (dx / length) * half;
+    const g = ctx.createLinearGradient(tail[0], tail[1], head[0], head[1]);
+    g.addColorStop(0, rgba(rgb, 0));
+    g.addColorStop(0.6, rgba(rgb, alpha * a * 0.6));
+    g.addColorStop(1, rgba(hot ? '255, 255, 240' : rgb, alpha * a));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(tail[0], tail[1]);
+    ctx.lineTo(head[0] + nx, head[1] + ny);
+    ctx.arc(head[0], head[1], half, Math.atan2(ny, nx), Math.atan2(ny, nx) + Math.PI, true);
+    ctx.closePath();
+    ctx.fill();
+  }
 }
 
 /**
@@ -529,28 +535,16 @@ const rake: Style = (c) => {
   const chest = hit && chestOf(c, c.targetSide);
   if (!hit || !chest) return;
   const t = hit.t;
-  const drawn = Math.min(1, (t + 1) / 5);
   const life = 1 - t / 22;
+  // Three claws raked down across the chest, then a spatter.
+  const facing = c.caster.facing;
+  for (let k = -1; k <= 1; k++) {
+    const cx = chest[0] - facing * yard * 0.5 + k * yard * 0.2;
+    const cy = chest[1] + k * yard * 0.05;
+    crescent(ctx, cx, cy, yard * 0.65, facing > 0 ? -1.0 : Math.PI + 1.0, facing > 0 ? 0.7 : Math.PI - 0.7, (t + 1) / 5, yard * 0.12, BLOOD, life);
+  }
   ctx.save();
   ctx.globalCompositeOperation = 'source-over';
-  ctx.lineCap = 'round';
-  for (let k = -1; k <= 1; k++) {
-    const x0 = chest[0] - yard * 0.45 + k * yard * 0.18;
-    const y0 = chest[1] - yard * 0.45;
-    const x1 = chest[0] + yard * 0.35 + k * yard * 0.18;
-    const y1 = chest[1] + yard * 0.45;
-    const xe = x0 + (x1 - x0) * drawn;
-    const ye = y0 + (y1 - y0) * drawn;
-    ctx.strokeStyle = rgba(BLOOD, life * 0.8);
-    ctx.lineWidth = yard * 0.1;
-    ctx.beginPath();
-    ctx.moveTo(x0, y0);
-    ctx.lineTo(xe, ye);
-    ctx.stroke();
-    ctx.strokeStyle = rgba('255, 230, 220', life);
-    ctx.lineWidth = yard * 0.03;
-    ctx.stroke();
-  }
   burst(chest[0], chest[1], t, 8, yard * 0.06, 91, (x, y, size) => {
     ctx.fillStyle = rgba(BLOOD, life);
     ctx.beginPath();
@@ -761,21 +755,26 @@ const felRush: Style = (c) => {
   if (!run) return;
   const life = c.caster.state === 'dash' ? 1 : Math.max(0, 1 - run.t / 40);
   if (life <= 0) return;
-  const from = c.s.at([run.x, 0, c.caster.z + 1.1]);
-  const to = c.s.at([c.caster.x, 0, c.caster.z + 1.1]);
+  const from = c.s.at([run.x, 0, c.caster.z + 0.9]);
+  const to = c.s.at([c.caster.x, 0, c.caster.z + 0.9]);
   if (!from || !to) return;
-  // A ribbon of fel fire where the demon hunter passed, licking upwards.
-  streak(ctx, from, to, yard * 1.1, FEL, life * 0.7);
-  streak(ctx, from, to, yard * 0.4, '220, 255, 180', life);
-  const random = rng(Math.floor(match.frame / 3) * 3 + c.side);
-  for (let k = 0; k < 14; k++) {
-    const t = random();
+  // Fel fire where the demon hunter passed: a band of green flame along the path, tongues
+  // licking up out of it, a hot thread through the middle, and a burst where the rush ends.
+  const steps = Math.max(4, Math.round(Math.hypot(to[0] - from[0], to[1] - from[1]) / (yard * 0.25)));
+  const random = rng(Math.floor(match.frame / 2) * 13 + c.side);
+  for (let k = 0; k <= steps; k++) {
+    const t = k / steps;
     const x = from[0] + (to[0] - from[0]) * t;
-    const y = from[1] + (to[1] - from[1]) * t + (random() - 0.5) * yard * 0.8;
-    const rise = random() * yard * 0.6;
-    glow(ctx, x, y - rise, yard * 0.18 * (0.5 + t), FEL, life * 0.8 * t, 0.1);
+    const y = from[1] + (to[1] - from[1]) * t;
+    const heat = life * (0.35 + 0.65 * t);
+    glow(ctx, x, y, yard * (0.35 + random() * 0.15), FEL, heat * 0.55, 0.1);
+    const lick = yard * (0.3 + random() * 0.7) * (0.4 + 0.6 * t);
+    streak(ctx, [x + (random() - 0.5) * yard * 0.2, y - lick], [x, y], yard * 0.22, FEL, heat * 0.8);
   }
-  trail(c, FEL, run.x, life * 0.4, 8, 0.05, 0.4, true);
+  ctx.strokeStyle = rgba('230, 255, 200', life * 0.9);
+  ctx.lineWidth = Math.max(1, yard * 0.04);
+  strokePath(ctx, jagged(from, to, 3, 0.08, random));
+  glow(ctx, to[0], to[1], yard * 0.7, FEL, life * 0.8, 0.25);
 };
 
 const chaosStrike: Style = (c) => {
