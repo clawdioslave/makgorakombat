@@ -10,6 +10,7 @@ import type { BuiltFighter } from '../fighters';
 import { headshotOf } from '../headshot';
 import type { Source } from '../Select';
 import { FightBar } from './FightBar';
+import { SequenceStrip, type SequenceView } from './SequenceStrip';
 import { Icons, type UiAssets } from './icons';
 import { UnitFrame } from './UnitFrame';
 import './ui.css';
@@ -35,6 +36,12 @@ interface Frame {
   weapons: [Weapon, Weapon];
   /** Each kit's abilities by id, for the tooltips. */
   specs: [Map<string, Ability>, Map<string, Ability>];
+  /** The fatality's key sequence while the winner enters it. */
+  sequence: SequenceView | undefined;
+  /** The fatality is playing: the frames step aside for it. */
+  cinematic: boolean;
+  /** Each side's ability ids in slot order, for the sequence's icons. */
+  kits: [string[], string[]];
 }
 
 /** Status effects whose icons are wanted before they appear. */
@@ -57,6 +64,26 @@ function specsOf(table: MoveTable): Map<string, Ability> {
   let specs = specCache.get(table);
   if (!specs) specCache.set(table, (specs = new Map(table.kit.abilities.map((a) => [a.id, a]))));
   return specs;
+}
+
+/** What the sequence strip shows, during the finish while the winner enters the fatality's keys. */
+function sequenceOf(match: Match, p2: Source): SequenceView | undefined {
+  const s = match.sequence;
+  const winner = match.roundWinner;
+  if (match.phase !== 'finish' || !s || winner === undefined) return undefined;
+  const spec = match.tables[winner].fatality.spec;
+  return {
+    winner,
+    facing: match.fighters[winner].facing,
+    name: spec.name,
+    colour: spec.colour,
+    tokens: spec.sequence,
+    progress: s.progress,
+    windowT: s.windowT,
+    penaltyT: s.penaltyT,
+    phaseT: match.phaseT,
+    source: winner === 0 ? 'keyboard' : p2,
+  };
 }
 
 const liveMatch = (): Match | undefined => (window as unknown as { mk?: { match?: () => Match } }).mk?.match?.();
@@ -82,6 +109,9 @@ export function FightUi({ fighters, p2, assets }: FightUiProps) {
         phase: match.phase,
         weapons: [match.tables[0].weapon, match.tables[1].weapon],
         specs: [specsOf(match.tables[0]), specsOf(match.tables[1])],
+        sequence: sequenceOf(match, p2),
+        cinematic: match.fatality !== undefined && (match.phase === 'fatality' || match.phase === 'ko'),
+        kits: [match.tables[0].kit.abilities.map((a) => a.id), match.tables[1].kit.abilities.map((a) => a.id)],
       });
       if (!loaded.current) {
         loaded.current = true;
@@ -129,9 +159,21 @@ export function FightUi({ fighters, p2, assets }: FightUiProps) {
   );
 
   if (!frame) return <div class="wowui" />;
+  // The winner's icons by sequence key: the ability in each slot, the weapon for the attack key.
+  const tokenIcons = (side: 0 | 1) => {
+    const map = new Map<string, string>();
+    frame.kits[side].forEach((id, n) => {
+      const url = abilityIcons[side].get(id);
+      if (url) map.set(`ability${n + 1}`, url);
+    });
+    const weapon = abilityIcons[side].get('attack');
+    if (weapon) map.set('attack', weapon);
+    return map;
+  };
   const human: [boolean, boolean] = [true, p2 !== 'cpu'];
   return (
-    <div class="wowui">
+    <div class={`wowui ${frame.cinematic ? 'cinematic' : ''}`}>
+      {frame.sequence && <SequenceStrip view={frame.sequence} icons={tokenIcons(frame.sequence.winner)} />}
       <div class="top">
         <UnitFrame side={0} view={frame.views[0]} portrait={portraits[0]} effectIcons={spellIcons} spellIcons={spellIcons} />
         <div class="clock-plate">

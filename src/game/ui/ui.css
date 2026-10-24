@@ -694,3 +694,243 @@
   pointer-events: none;
   z-index: 2;
 }
+
+/* ---- the fatality ------------------------------------------------------------------------ */
+
+/* The frames and bars step aside while the fatality plays, so the scene has the whole screen. */
+.wowui .top,
+.wowui .bottom,
+.wowui > .hint {
+  transition: opacity 0.35s ease;
+}
+
+.wowui.cinematic .top,
+.wowui.cinematic .bottom,
+.wowui.cinematic > .hint {
+  opacity: 0;
+}
+
+/* The key sequence: a bar of buttons on the winner's side, under the fatality's name. */
+.sequence {
+  position: absolute;
+  top: 64%;
+  left: 26%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.6em 0.8em 0.7em;
+  background: linear-gradient(180deg, rgba(30, 30, 36, 0.9), rgba(10, 10, 14, 0.92));
+  border: 1px solid #5c5c66;
+  border-radius: 0.45em;
+  box-shadow:
+    inset 0 0 0 1px #000,
+    0 0 0 1px #000,
+    0 0 1.6em color-mix(in srgb, var(--fatality) 35%, transparent),
+    0 0.4em 1.2em rgba(0, 0, 0, 0.7);
+  animation: sequence-in 0.18s ease-out;
+}
+
+.sequence.p2 {
+  left: 74%;
+}
+
+@keyframes sequence-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 1.2em));
+  }
+}
+
+.sequence.wrong {
+  animation: sequence-shake 0.25s linear;
+}
+
+@keyframes sequence-shake {
+  20% { transform: translate(calc(-50% - 0.35em), -50%); }
+  40% { transform: translate(calc(-50% + 0.35em), -50%); }
+  60% { transform: translate(calc(-50% - 0.2em), -50%); }
+  80% { transform: translate(calc(-50% + 0.2em), -50%); }
+}
+
+.sequence-name {
+  font-family: var(--morpheus);
+  font-size: 1.7em;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--fatality);
+  text-shadow: 1px 1px 0 #000, 0 0 0.5em #000, 0 0 1em color-mix(in srgb, var(--fatality) 60%, transparent);
+}
+
+.sequence-keys {
+  display: flex;
+  gap: 0.5em;
+}
+
+.seq-slot {
+  position: relative;
+  width: 3.4em;
+  height: 3.4em;
+  display: grid;
+  place-items: center;
+  border-radius: 0.25em;
+  background: radial-gradient(circle at 50% 40%, #1d1d22, #08080a 80%);
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 2px #4a4a52,
+    inset 0 0 0 3px rgba(0, 0, 0, 0.55),
+    inset 0 0 0.8em rgba(0, 0, 0, 0.9);
+}
+
+.seq-slot img {
+  position: absolute;
+  top: 0.18em;
+  left: 0.18em;
+  width: calc(100% - 0.36em);
+  height: calc(100% - 0.36em);
+  border-radius: 0.15em;
+  object-fit: cover;
+  filter: saturate(0.4) brightness(0.55);
+}
+
+.seq-slot .arrow {
+  width: 62%;
+  height: 62%;
+  fill: none;
+  stroke: #d8d8e0;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(1px 1px 0 #000);
+}
+
+.seq-slot .key {
+  position: absolute;
+  top: 0.15em;
+  right: 0.25em;
+  font-family: var(--narrow);
+  font-weight: 700;
+  font-size: 0.75em;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000, 0 0 3px #000, -1px -1px 0 #000;
+}
+
+/* The next key: a gold rim, and a ring wiping round it as its 1.5 s run out. */
+.seq-slot.current {
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 2px var(--wow-gold),
+    inset 0 0 0 3px rgba(0, 0, 0, 0.55),
+    inset 0 0 1em rgba(255, 209, 0, 0.25);
+}
+
+.seq-slot.current img {
+  filter: none;
+}
+
+.seq-slot.current .arrow {
+  stroke: var(--wow-gold);
+}
+
+.seq-slot .ring {
+  position: absolute;
+  inset: -0.4em;
+  border-radius: 50%;
+  background: conic-gradient(var(--wow-gold) calc(var(--t) * 360deg), transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent calc(70% - 0.2em), #000 calc(70% - 0.15em), #000 70%, transparent calc(70% + 0.05em));
+  mask: radial-gradient(circle, transparent calc(70% - 0.2em), #000 calc(70% - 0.15em), #000 70%, transparent calc(70% + 0.05em));
+  pointer-events: none;
+}
+
+/* A key landed: lit gold, as a button that has gone off. */
+.seq-slot.lit {
+  background: radial-gradient(circle at 50% 40%, #fff2a0, var(--wow-gold) 50%, #b8860b 100%);
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 2px #fff6c0,
+    0 0 0.8em rgba(255, 209, 0, 0.6);
+}
+
+.seq-slot.lit img {
+  filter: none;
+  opacity: 0.85;
+}
+
+.seq-slot.lit .arrow {
+  stroke: #2a1a00;
+  filter: none;
+}
+
+.seq-slot.fresh {
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 2px #fff,
+    0 0 1.6em rgba(255, 220, 90, 0.95);
+}
+
+/* A wrong key: every slot red for the half-second lock. */
+.sequence.wrong .seq-slot {
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 2px var(--wow-red),
+    inset 0 0 1.2em rgba(255, 32, 32, 0.6);
+}
+
+.sequence.wrong .seq-slot .arrow {
+  stroke: #ffb0b0;
+}
+
+.seq-slot .penalty {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(180, 10, 10, calc(0.45 * var(--t)));
+  pointer-events: none;
+}
+
+/* The finish window, as a cast bar. */
+.sequence-bar {
+  position: relative;
+  width: 100%;
+  height: 1.1em;
+  background: linear-gradient(180deg, #0c0a09, #1a1412);
+  border: 1px solid #000;
+  border-radius: 0.15em;
+  box-shadow: inset 0 0 0 1px #5c5c66;
+  overflow: hidden;
+}
+
+.sequence-bar .fill {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: 1px;
+  width: calc((100% - 2px) * var(--fill));
+  background: linear-gradient(180deg, #ffe680, #ffc21f 50%, #d98f00);
+}
+
+.sequence-bar.late .fill {
+  background: linear-gradient(180deg, #ff8a80, #e02020 50%, #8a0a0a);
+}
+
+.sequence-bar .spark {
+  position: absolute;
+  top: -40%;
+  bottom: -40%;
+  left: calc(1px + (100% - 2px) * var(--fill) - 0.4em);
+  width: 0.8em;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.9), rgba(255, 240, 180, 0) 70%);
+}
+
+.sequence-bar .text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--narrow);
+  font-weight: 700;
+  font-size: 0.75em;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000, 0 0 3px #000;
+}
