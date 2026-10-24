@@ -55,7 +55,7 @@ export class Fighters {
         title: tile.legend.title.toUpperCase(),
         raceId: tile.raceId,
         sex: tile.sex,
-        classId: undefined,
+        classId: tile.legend.classId,
         choices: [],
         // The display's hands are empty: the legend's signature weapon goes in them.
         gear: Object.entries(tile.legend.weapons ?? {}).flatMap(([slot, id]) => (id ? [[slot as Slot, id] as [Slot, number]] : [])),
@@ -99,11 +99,32 @@ export class Fighters {
     return [...best.pieces, ...best.weapons].map(([slot, item]) => [slot, item.id]);
   }
 
+  /** The class's set weapons alone, for a legend whose own weapon the install lacks. */
+  private async setWeapons(classId: number): Promise<[Slot, number][]> {
+    const kit = await this.bestKit(classId);
+    return kit.filter(([slot]) => slot === 'mainHand' || slot === 'offHand');
+  }
+
   /** Build the champion, or hand back the one built before. */
   get(champion: Champion): Promise<BuiltFighter> {
     let fighter = this.built.get(champion.key);
     if (!fighter) {
-      fighter = this.client.fighter(champion.raceId, champion.sex, champion.choices, champion.gear, [...ALL_MOVE_NAMES], champion.npc).then((result) => {
+      const build = (gear: [Slot, number][]) => this.client.fighter(champion.raceId, champion.sex, champion.choices, gear, [...ALL_MOVE_NAMES], champion.npc);
+      fighter = build(champion.gear).then(async (first) => {
+        // A legend whose signature weapon this install does not have would fight bare-handed:
+        // give it the weapon of its class's set instead, so a shaman has a mace and a hunter a bow.
+        const wantedWeapon = champion.gear.some(([slot]) => slot === 'mainHand');
+        if (first.wielding === 'unarmed' && wantedWeapon && champion.npc !== undefined && champion.classId !== undefined) {
+          const weapons = await this.setWeapons(champion.classId);
+          if (weapons.length > 0) {
+            console.warn(`${champion.name}: ${first.scene.problems.join('; ')}; wielding the class set's weapon instead`);
+            const gear = [...champion.gear.filter(([slot]) => slot !== 'mainHand' && slot !== 'offHand'), ...weapons];
+            champion.gear = gear;
+            return build(gear);
+          }
+        }
+        return first;
+      }).then((result) => {
         const rig = posableRig(result.rig);
         if (rig.meshCount !== result.scene.meshes.length) throw new Error(`The fighter's rig has ${rig.meshCount} meshes for ${result.scene.meshes.length} in the scene`);
         if (result.scene.problems.length > 0) console.warn(`${champion.name}: ${result.scene.problems.join('; ')}`);
