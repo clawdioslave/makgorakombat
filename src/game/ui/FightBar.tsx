@@ -1,16 +1,19 @@
-import { useEffect, useRef } from 'preact/hooks';
-import { GCD_FRAMES } from '../../engine/abilities';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { type Ability, GCD_FRAMES } from '../../engine/abilities';
 import { type InputAction, KEYS, keyLabel } from '../../engine/input';
+import type { Weapon } from '../../engine/moves';
 import type { AbilityView, FighterView } from '../../engine/view';
+import { describeAbility, describeWeapon, type Tooltip } from './describe';
 import { seconds } from './UnitFrame';
 
 /*
  * A player's action bar as the game lays its buttons out: square slots with the spell's own
  * icon, the key in the corner, a clockwise cooldown wipe with the seconds left in the middle, a
  * quick wipe over every slot for the global cooldown, the icon greyed while it cannot go and
- * tinted blue when the resource is short, the key in red when the target is out of reach, the
- * reason on hover, a gold flash when the key is pressed and a glow while the ability is in use.
- * The first slot is the auto-attack, with the swing timer wiping round it.
+ * washed blue when the resource is short, the key in red when the target is out of reach, a
+ * gold flash when the key is pressed and a glow while the ability is in use. The first slot is
+ * the auto-attack, with the swing timer wiping round it. Hovering a slot, or holding its key,
+ * opens the game's tooltip: name, cost, range, cast time, cooldown and what it does.
  */
 
 export interface FightBarProps {
@@ -18,51 +21,92 @@ export interface FightBarProps {
   view: FighterView;
   /** Icons by ability id; 'attack' for the auto-attack. */
   icons: ReadonlyMap<string, string>;
-  /** Ranged weapons shoot instead of swinging. */
-  ranged: boolean;
+  /** The abilities' numbers, by id, for the tooltips. */
+  specs: ReadonlyMap<string, Ability>;
+  weapon: Weapon;
 }
 
 /** How long the flash of a pressed key lasts. */
 const FLASH_MS = 180;
+/** Holding a key this long opens its tooltip. */
+const HOLD_MS = 350;
 
-export function FightBar({ side, view, icons, ranged }: FightBarProps) {
-  // When each action's key last went down, so the slot can flash even when the press did nothing.
-  const pressed = useRef(new Map<InputAction, number>());
+export function FightBar({ side, view, icons, specs, weapon }: FightBarProps) {
+  // When each action's key went down (and whether it is still down), so a slot can flash even
+  // when the press did nothing, and show its tooltip while the key is held.
+  const pressed = useRef(new Map<InputAction, { at: number; down: boolean }>());
+  const [hovered, setHovered] = useState<string>();
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
+    const actionsOf = (code: string) => (Object.keys(KEYS[side]) as InputAction[]).filter((action) => KEYS[side][action].includes(code));
+    const onDown = (event: KeyboardEvent) => {
       if (event.repeat) return;
-      const map = KEYS[side];
-      for (const action of Object.keys(map) as InputAction[]) {
-        if (map[action].includes(event.code)) pressed.current.set(action, performance.now());
+      for (const action of actionsOf(event.code)) pressed.current.set(action, { at: performance.now(), down: true });
+    };
+    const onUp = (event: KeyboardEvent) => {
+      for (const action of actionsOf(event.code)) {
+        const press = pressed.current.get(action);
+        if (press) press.down = false;
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+    return () => {
+      window.removeEventListener('keydown', onDown);
+      window.removeEventListener('keyup', onUp);
+    };
   }, [side]);
-  const flashing = (action: InputAction) => performance.now() - (pressed.current.get(action) ?? -Infinity) < FLASH_MS;
+  const now = performance.now();
+  const flashing = (action: InputAction) => now - (pressed.current.get(action)?.at ?? -Infinity) < FLASH_MS;
+  const held = (action: InputAction) => {
+    const press = pressed.current.get(action);
+    return press !== undefined && press.down && now - press.at >= HOLD_MS;
+  };
 
   const swing = view.swing;
   const swingSweep = swing.total > 0 ? Math.min(1, swing.remaining / swing.total) : 0;
+  const attackTip = describeWeapon(weapon);
   return (
     // A click on the bar must not take the keyboard focus off the stage, or the keys go dead.
-    <div class={`fightbar p${side + 1}`} onMouseDown={(event) => event.preventDefault()}>
+    <div class={`fightbar p${side + 1}`} onMouseDown={(event) => event.preventDefault()} onMouseLeave={() => setHovered(undefined)}>
       <div
         class={`slot auto ${swing.auto ? 'on' : ''} ${swing.inReach ? '' : 'far'} ${flashing('attack') ? 'flash' : ''}`}
-        title={`${ranged ? 'Auto Shot: hold to keep shooting' : 'Attack: hold to keep swinging'}${swing.inReach ? '' : ' — OUT OF RANGE'}`}
+        onMouseEnter={() => setHovered('attack')}
       >
-        <Icon url={icons.get('attack')} name={ranged ? 'SHOOT' : 'ATTACK'} />
+        <Icon url={icons.get('attack')} name={attackTip.name.toUpperCase()} />
         <span class="sweep" style={{ '--sweep': swingSweep }} />
         <span class="key">{keyLabel(side, 'attack')}</span>
         <span class="rim" />
+        {(hovered === 'attack' || held('attack')) && <TooltipBox tip={attackTip} why={swing.inReach ? undefined : 'OUT OF RANGE'} colour={view.resource.colour} />}
       </div>
       {view.abilities.map((ability) => (
-        <AbilitySlot key={ability.id} side={side} ability={ability} icon={icons.get(ability.id)} colour={view.resource.colour} flash={flashing(ability.action)} />
+        <AbilitySlot
+          key={ability.id}
+          side={side}
+          ability={ability}
+          spec={specs.get(ability.id)}
+          resource={view.resource}
+          icon={icons.get(ability.id)}
+          flash={flashing(ability.action)}
+          open={hovered === ability.id || held(ability.action)}
+          onHover={() => setHovered(ability.id)}
+        />
       ))}
     </div>
   );
 }
 
-function AbilitySlot({ side, ability, icon, colour, flash }: { side: 0 | 1; ability: AbilityView; icon: string | undefined; colour: string; flash: boolean }) {
+interface SlotProps {
+  side: 0 | 1;
+  ability: AbilityView;
+  spec: Ability | undefined;
+  resource: FighterView['resource'];
+  icon: string | undefined;
+  flash: boolean;
+  open: boolean;
+  onHover: () => void;
+}
+
+function AbilitySlot({ side, ability, spec, resource, icon, flash, open, onHover }: SlotProps) {
   const cooling = ability.cooldown.remaining > 0 && ability.cooldown.total > 0;
   const onGcd = !cooling && ability.gcd > 0;
   const sweep = cooling ? ability.cooldown.remaining / ability.cooldown.total : onGcd ? ability.gcd / GCD_FRAMES : 0;
@@ -80,23 +124,39 @@ function AbilitySlot({ side, ability, icon, colour, flash }: { side: 0 | 1; abil
     dim ? 'dim' : '',
     ability.usable ? 'ready' : '',
   ].join(' ');
-  const detail = [ability.cost > 0 ? `${ability.cost} ${colourName(colour)}` : '', ability.castTime > 0 ? `${(ability.castTime / 60).toFixed(1)}s cast` : 'instant'].filter(Boolean).join(', ');
-  const title = `${ability.name} (${detail})${why ? ` — ${why}` : ''}`;
+  const tip: Tooltip = spec
+    ? describeAbility(spec, resource.kind)
+    : { name: ability.name, cost: ability.cost ? `${ability.cost} ${resource.name}` : '', range: '', cast: ability.castTime ? `${(ability.castTime / 60).toFixed(1)} sec cast` : 'Instant', cooldown: '', description: '' };
   return (
-    <div class={cls} title={title} style={{ '--power': colour }}>
+    <div class={cls} style={{ '--power': resource.colour }} onMouseEnter={onHover}>
       <Icon url={icon} name={ability.short} />
       <span class="sweep" style={{ '--sweep': sweep }} />
       {cooling && <span class="time">{seconds(ability.cooldown.remaining)}</span>}
       <span class="key">{keyLabel(side, ability.action)}</span>
       {ability.cost > 0 && <span class="cost">{ability.cost}</span>}
       <span class="rim" />
+      {open && <TooltipBox tip={tip} why={why} colour={resource.colour} />}
     </div>
   );
 }
 
-/** The resource a cost is paid in, from its colour: the view carries the colour per fighter, not per ability. */
-function colourName(colour: string): string {
-  return { '#c41f3b': 'rage', '#fff569': 'energy', '#2f7df6': 'mana', '#ff8040': 'focus', '#00d1ff': 'runic power', '#c84bf0': 'fury' }[colour] ?? '';
+/** The game's tooltip: a dark bevelled box above the slot. */
+function TooltipBox({ tip, why, colour }: { tip: Tooltip; why: string | undefined; colour: string }) {
+  return (
+    <div class="tooltip" style={{ '--power': colour }}>
+      <div class="row">
+        <span class="tip-name">{tip.name}</span>
+        {tip.cost && <span class="tip-cost">{tip.cost}</span>}
+      </div>
+      {tip.range && <div class="row">{tip.range}</div>}
+      <div class="row">
+        <span>{tip.cast}</span>
+        {tip.cooldown && <span>{tip.cooldown}</span>}
+      </div>
+      {tip.description && <div class="desc">{tip.description}</div>}
+      {why && why !== 'NOT NOW' && <div class="why">{why}</div>}
+    </div>
+  );
 }
 
 /** The spell's picture, or its short name on the plain slot until the picture arrives. */

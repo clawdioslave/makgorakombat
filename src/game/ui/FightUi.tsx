@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { BRAND } from '../../engine/brand';
+import type { Ability } from '../../engine/abilities';
 import type { Match } from '../../engine/engine';
+import type { MoveTable, Weapon } from '../../engine/moves';
 import { keyLabel } from '../../engine/input';
 import { ROUNDS_TO_WIN } from '../../engine/stage';
 import { type FighterView, fighterView } from '../../engine/view';
@@ -29,7 +31,9 @@ interface Frame {
   seconds: number;
   round: number;
   phase: Match['phase'];
-  ranged: [boolean, boolean];
+  weapons: [Weapon, Weapon];
+  /** Each kit's abilities by id, for the tooltips. */
+  specs: [Map<string, Ability>, Map<string, Ability>];
 }
 
 /** Status effects whose icons are wanted before they appear. */
@@ -44,6 +48,14 @@ function Studs({ wins, side }: { wins: number; side: 0 | 1 }) {
       ))}
     </div>
   );
+}
+
+const specCache = new WeakMap<MoveTable, Map<string, Ability>>();
+/** A kit's abilities by id, kept per table so the frame snapshot is cheap. */
+function specsOf(table: MoveTable): Map<string, Ability> {
+  let specs = specCache.get(table);
+  if (!specs) specCache.set(table, (specs = new Map(table.kit.abilities.map((a) => [a.id, a]))));
+  return specs;
 }
 
 const liveMatch = (): Match | undefined => (window as unknown as { mk?: { match?: () => Match } }).mk?.match?.();
@@ -67,7 +79,8 @@ export function FightUi({ fighters, p2, assets }: FightUiProps) {
         seconds: Math.max(0, Math.ceil(match.timer / 60)),
         round: match.round,
         phase: match.phase,
-        ranged: [match.tables[0].weapon.ranged, match.tables[1].weapon.ranged],
+        weapons: [match.tables[0].weapon, match.tables[1].weapon],
+        specs: [specsOf(match.tables[0]), specsOf(match.tables[1])],
       });
       if (!loaded.current) {
         loaded.current = true;
@@ -134,12 +147,12 @@ export function FightUi({ fighters, p2, assets }: FightUiProps) {
       <div class="bottom">
         {([0, 1] as const).map((i) => (
           <div class={`bar-stack p${i + 1}`} key={i}>
-            <FightBar side={i} view={frame.views[i]} icons={abilityIcons[i]} ranged={frame.ranged[i]} />
+            <FightBar side={i} view={frame.views[i]} icons={abilityIcons[i]} specs={frame.specs[i]} weapon={frame.weapons[i]} />
             {frame.phase === 'intro' && frame.round === 1 && (
               <div class="hint">
                 {human[i] ? (
                   <>
-                    <b>{keyLabel(i, 'left')}</b> <b>{keyLabel(i, 'right')}</b> move · <b>{keyLabel(i, 'jump')}</b> jump · <b>{keyLabel(i, 'attack')}</b> attack
+                    <b>{keyLabel(i, 'left')}</b> <b>{keyLabel(i, 'right')}</b> move · <b>{keyLabel(i, 'jump')}</b> jump · <b>{keyLabel(i, 'attack')}</b> attack · hover or hold a key for what it does
                   </>
                 ) : (
                   'COMPUTER'
