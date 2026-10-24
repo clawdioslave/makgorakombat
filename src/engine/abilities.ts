@@ -291,6 +291,14 @@ export function classFor(classId: number | undefined, wielding: Wielding): numbe
   return wielding === 'bow' || wielding === 'rifle' || wielding === 'crossbow' ? 3 : 1;
 }
 
+/** The abilities and resource a class plays with, before any model is involved: for a guide or a roster screen. */
+export function kitSpec(classId: number | undefined, wielding: Wielding = 'oneHand'): { classKey: string; className: string; resource: ResourceKind; abilities: readonly Ability[] } {
+  const twoHand = wielding === 'twoHand' || wielding === 'long';
+  const spec = classKits(twoHand)[classFor(classId, wielding)]!;
+  const legend = classId === undefined || !classKits(false)[classId];
+  return { classKey: legend ? 'champion' : spec.key, className: legend ? 'CHAMPION' : spec.name, resource: spec.resource, abilities: spec.abilities };
+}
+
 /** The kit a class plays with, resolved to the animations the model has; `idle` fills in for a missing one. */
 export function resolveKit(classId: number | undefined, wielding: Wielding, find: Finder, idle: Move): Kit {
   const twoHand = wielding === 'twoHand' || wielding === 'long';
