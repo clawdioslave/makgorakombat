@@ -1,6 +1,6 @@
 import type { WeaponKind } from '@mogshot/character/equipment';
 import type { AnimationInfo } from '@mogshot/character/scene';
-import { ABILITY_ANIMATIONS, type Kit, resolveKit } from './abilities';
+import { ABILITY_ANIMATIONS, type Kit, resolveKit, type SlotIndex } from './abilities';
 import { finderOf, type HitWindow, type Move, moveFrom, type Variation } from './anim';
 
 export type { Finder, HitWindow, Move, Variation } from './anim';
@@ -33,8 +33,8 @@ export type MoveName =
   | 'intro'
   | 'win';
 
-/** A move a fighter can be in: a core move, or one of the kit's four abilities. */
-export type MoveRef = MoveName | `ability${0 | 1 | 2 | 3}` | `cast${0 | 1 | 2 | 3}`;
+/** A move a fighter can be in: a core move, or one of the kit's abilities (its own animation, or the one held while casting or dashing). */
+export type MoveRef = MoveName | `ability${SlotIndex}` | `cast${SlotIndex}`;
 
 export type Wielding = WeaponKind | 'unarmed';
 
@@ -105,7 +105,7 @@ const ALL_READY = ['Ready1H', 'Ready2H', 'ReadyUnarmed', 'Ready2HL', 'ReadyBow',
 const ALL_ATTACK = ['Attack1H', 'Attack2H', 'Attack2HL', 'AttackUnarmed', 'AttackBow', 'AttackRifle', 'AttackCrossbow', 'AttackThrown'];
 const ALL_PARRY = ['ShieldBlock', 'Parry1H', 'Parry2H', 'Parry2HL', 'ParryUnarmed', 'Dodge'];
 
-const SWING_HIT: HitWindow = { from: 0.25, to: 0.5, recover: 0.45 };
+const SWING_HIT: HitWindow = { from: 0.2, to: 0.5, recover: 0.45 };
 
 /** Candidates in order of preference, for a given weapon. `swing` collects all variations of the name it finds. */
 function candidates(wielding: Wielding, shield: boolean): Record<MoveName, { names: string[]; loop: boolean; hit?: HitWindow }> {

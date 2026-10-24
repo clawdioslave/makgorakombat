@@ -97,7 +97,7 @@ describe('cpuInputs', () => {
     place(match, 4);
     let interrupted = false;
     for (let f = 0; f < 600 && !interrupted; f++) {
-      const p1 = match.fighters[0].state === 'cast' || match.fighters[0].gcd > 0 ? inputs() : inputs({ ability: 1 }); // Fireball over and over
+      const p1 = match.fighters[0].state === 'cast' || match.fighters[0].gcd > 0 ? inputs() : inputs({ ability: 0 }); // Frostbolt over and over
       const both: [Inputs, Inputs] = [p1, cpuInputs(match, 1)];
       tick(match, both);
       if (match.fighters[0].lockoutT > 0) interrupted = true;
@@ -147,9 +147,9 @@ describe('InputReader', () => {
     reader.press('KeyJ');
     reader.press('KeyU');
     let [p1] = reader.read();
-    expect(p1).toMatchObject({ right: true, attack: true, abilities: [false, false, true, false] });
+    expect(p1).toMatchObject({ right: true, attack: true, abilities: [false, false, true] });
     [p1] = reader.read();
-    expect(p1).toMatchObject({ right: true, attack: true, abilities: [false, false, false, false] });
+    expect(p1).toMatchObject({ right: true, attack: true, abilities: [false, false, false] });
     reader.release('KeyU');
     reader.read();
     reader.press('KeyU');
@@ -170,9 +170,9 @@ describe('InputReader', () => {
     const reader = new InputReader();
     reader.press('ArrowLeft');
     reader.press('Numpad2');
-    reader.press('Quote');
+    reader.press('ShiftRight');
     const [, p2] = reader.read();
-    expect(p2).toMatchObject({ left: true, abilities: [false, true, false, true] });
+    expect(p2).toMatchObject({ left: true, abilities: [false, true, true] });
     reader.setSource(1, 'cpu');
     const match = fakeMatch(4);
     skipIntro(match);

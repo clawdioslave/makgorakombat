@@ -85,7 +85,7 @@ describe('resolveMoves', () => {
 
   it('only the swing has a hit window', () => {
     const table = fakeTable();
-    expect(table.moves.swing.hit).toMatchObject({ from: 0.25, to: 0.5, recover: 0.45 });
+    expect(table.moves.swing.hit).toMatchObject({ from: 0.2, to: 0.5, recover: 0.45 });
     expect(table.moves.parry.hit).toBeUndefined();
   });
 
@@ -107,7 +107,7 @@ describe('ALL_MOVE_NAMES', () => {
   it('covers what every weapon, move and ability can ask for', () => {
     for (const name of ['Ready1H', 'Ready2H', 'ReadyUnarmed', 'ReadyBow', 'Stand', 'Attack2HL', 'AttackRifle', 'Special1H', 'Kick', 'SpellCastDirected',
       'ShieldBlock', 'Dodge', 'CombatWound', 'Knockdown', 'Stun', 'Death', 'CombatExecute', 'BattleRoar', 'EmoteCheer', 'JumpLandRun',
-      'CombatChargeLoop', 'CombatChargeEnd', 'CombatWhirlwind', 'CombatAbility2HBig01', 'MagSpellCastBothFront', 'Stormstrike', 'FelRushLoop', 'DHBladeDance1', 'DeathStrike', 'RisingSunKick', 'CombatEviscerate']) {
+      'CombatChargeLoop', 'CombatChargeEnd', 'CombatAbility2HBig01', 'MagSpellCastBothFront', 'Stormstrike', 'FelRushLoop', 'DHBladeDance1', 'DeathStrike', 'RisingSunKick']) {
       expect(ALL_MOVE_NAMES, name).toContain(name);
     }
   });
@@ -118,11 +118,10 @@ describe('resolveKit', () => {
     const warrior = fakeTable(FULL_SET, 'twoHand', {}, 1).kit;
     expect(warrior.classKey).toBe('warrior');
     expect(warrior.resource).toBe('rage');
-    expect(warrior.abilities.map((a) => a.id)).toEqual(['charge', 'mortalStrike', 'whirlwind', 'execute']);
+    expect(warrior.abilities.map((a) => a.id)).toEqual(['charge', 'mortalStrike', 'execute']);
     expect(warrior.abilities[0].hold.animation).toBe('CombatChargeLoop');
     expect(warrior.abilities[0].move.animation).toBe('CombatChargeEnd');
     expect(warrior.abilities[1].move.animation).toBe('CombatAbility2HBig01');
-    expect(warrior.abilities[2].move.animation).toBe('CombatWhirlwind');
     const mage = fakeTable(FULL_SET, 'oneHand', {}, 8).kit;
     expect(mage.resource).toBe('mana');
     expect(mage.abilities[0].cast).toBe(90);
@@ -131,7 +130,7 @@ describe('resolveKit', () => {
     expect(mage.abilities[0].hold.loop).toBe(true);
     for (const id of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]) {
       const kit = fakeTable(FULL_SET, 'oneHand', {}, id).kit;
-      expect(kit.abilities.length).toBe(4);
+      expect(kit.abilities.length).toBe(3);
       for (const a of kit.abilities) expect(a.move.variations[0]?.duration).toBeGreaterThan(0);
     }
   });
@@ -149,7 +148,7 @@ describe('resolveKit', () => {
   it('falls back to a plain strike when the model lacks the ability animation', () => {
     const kit = fakeTable(['Stand', 'Attack1H', 'CombatAbility1H01'], 'oneHand', {}, 1).kit;
     expect(kit.abilities[1].move.animation).toBe('CombatAbility1H01');
-    expect(kit.abilities[2].move.animation).toBe('');
-    expect(kit.abilities[2].move.variations[0]?.sequence).toBe(0);
+    expect(kit.abilities[0].hold.animation).toBe('');
+    expect(kit.abilities[0].hold.variations[0]?.sequence).toBe(0);
   });
 });

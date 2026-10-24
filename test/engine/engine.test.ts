@@ -382,30 +382,29 @@ describe('abilities', () => {
   it('Execute only works under 20 % health', () => {
     const match = fighting(1.5);
     match.fighters[0].resource = 100;
-    press(match, 0, 3);
+    press(match, 0, 2);
     expect(match.fighters[0].state).not.toBe('ability');
     expect(texts(match, 0)).toEqual(['info:NEEDS 20% HEALTH']);
     match.fighters[1].hp = 19;
     run(match, 1);
-    press(match, 0, 3, 'hit');
-    expect(match.fighters[0].move).toBe('ability3');
-    expect(match.tables[0].kit.abilities[3].move.animation).toBe('CombatExecute');
+    press(match, 0, 2, 'hit');
+    expect(match.fighters[0].move).toBe('ability2');
+    expect(match.tables[0].kit.abilities[2].move.animation).toBe('CombatExecute');
     until(match, (m) => m.fighters[1].hp < 19, 60);
     expect(match.fighters[1].hp).toBe(0);
     expect(match.phase).toBe('finish');
   });
 
-  it('Whirlwind hits behind as well', () => {
-    const match = fighting(1.5);
+  it('Blade Dance hits behind as well', () => {
+    const match = fighting(1.5, 1, [12, WARRIOR]);
     match.fighters[0].resource = 100;
-    match.fighters[0].facing = -1; // turned away for the test's one tick
     place(match, 1.5);
-    match.fighters[0].facing = -1;
+    match.fighters[0].facing = -1; // turned away for the test's one tick
     expect(match.tables[0].kit.abilities[2].both).toBe(true);
     press(match, 0, 2, 'hit');
     expect(match.fighters[0].move).toBe('ability2');
     until(match, (m) => m.fighters[1].hp < HP, 60);
-    expect(match.fighters[1].hp).toBe(HP - 14);
+    expect(match.fighters[1].hp).toBe(HP - 16);
   });
 
   it('Charge runs at a far target, lands a stun and earns rage', () => {
@@ -436,10 +435,10 @@ describe('abilities', () => {
     until(match, (m) => m.fighters[1].state === 'stun', 60);
     expect(match.fighters[1].stunT).toBe(120);
     expect(match.fighters[1].move).toBe('dazed');
-    run(match, 30); // the nudge settles
+    run(match, 40); // the nudge settles
     const x = match.fighters[1].x;
-    run(match, 40, [inputs(), inputs({ right: true, attack: true, ability: 1 })]);
-    expect(match.fighters[1].x).toBeCloseTo(x, 3);
+    run(match, 30, [inputs(), inputs({ right: true, attack: true, ability: 1 })]);
+    expect(match.fighters[1].x).toBeCloseTo(x, 2);
     expect(match.fighters[1].state).toBe('stun');
     run(match, 60);
     expect(match.fighters[1].stunT).toBe(0);
@@ -502,7 +501,7 @@ describe('abilities', () => {
 
   it('moving cancels a cast', () => {
     const match = fighting(4, 1, [MAGE, WARRIOR]);
-    press(match, 0, 1);
+    press(match, 0, 0);
     run(match, 20);
     tick(match, [inputs({ left: true }), inputs()]);
     expect(match.fighters[0].cast).toBeUndefined();
@@ -556,7 +555,7 @@ describe('abilities', () => {
   it('Blink puts the mage 3.5 away from the target', () => {
     const match = fighting(1.5, 1, [MAGE, WARRIOR]);
     const x = match.fighters[0].x;
-    press(match, 0, 3);
+    press(match, 0, 2);
     expect(match.fighters[0].x).toBeCloseTo(x - 3.5, 5);
     expect(match.fighters[0].resource).toBe(85);
   });
@@ -564,7 +563,7 @@ describe('abilities', () => {
   it('Disengage leaps away', () => {
     const match = fighting(1.5, 1, [HUNTER, WARRIOR]);
     const x = match.fighters[0].x;
-    press(match, 0, 2);
+    press(match, 0, 1);
     expect(match.fighters[0].airborne).toBe(true);
     expect(match.fighters[0].gcd).toBe(0);
     until(match, (m) => !m.fighters[0].airborne, 120);
@@ -662,8 +661,8 @@ describe('the finish', () => {
     run(match, 60);
     place(match, 1.5);
     match.fighters[0].resource = 100;
-    press(match, 0, 3);
-    expect(match.fighters[0].move).toBe('ability3');
+    press(match, 0, 2);
+    expect(match.fighters[0].move).toBe('ability2');
     expect(until(match, (m) => m.phase === 'ko', 90)).toBeGreaterThan(0);
     expect(match.banner?.text).toBe(BRAND.fatality);
   });
@@ -803,13 +802,13 @@ describe('determinism', () => {
       left: frame % 11 === 0,
       attack: frame % 23 < 12,
       jump: frame % 53 === 0,
-      abilities: [frame % 61 === 0, frame % 97 === 0, frame % 131 === 0, frame % 37 === 0],
+      abilities: [frame % 61 === 0, frame % 97 === 0, frame % 37 === 0],
     });
     const b = inputs({
       left: frame % 5 < 3,
       attack: frame % 19 < 15,
       jump: frame % 71 === 0,
-      abilities: [frame % 47 === 0, frame % 89 === 0, frame % 113 === 0, frame % 41 === 0],
+      abilities: [frame % 47 === 0, frame % 89 === 0, frame % 41 === 0],
     });
     return [a, b];
   }

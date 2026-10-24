@@ -1,3 +1,4 @@
+import { ABILITY_SLOTS } from './abilities';
 import { abilityBlocked, type Inputs, type Match, nextRandom, noInputs } from './engine';
 import { FINISH_FRAMES, HALF } from './stage';
 
@@ -12,7 +13,7 @@ export function cpuInputs(match: Match, me: 0 | 1): Inputs {
   const memory = match.cpu[me];
   if (match.frame < memory.next) {
     // Presses are edge-triggered: only the decision tick carries them. The attack key stays held.
-    return { ...memory.held, jump: false, abilities: [false, false, false, false] };
+    return { ...memory.held, jump: false, abilities: [false, false, false] };
   }
   const decision = decide(match, me);
   memory.held = decision;
@@ -50,7 +51,7 @@ function decide(match: Match, me: 0 | 1): Inputs {
   /** Abilities that would go right now, by index. */
   const usable = (): number[] => {
     const list: number[] = [];
-    for (let n = 0; n < 4; n++) {
+    for (let n = 0; n < ABILITY_SLOTS; n++) {
       const a = kit.abilities[n]!;
       if (a.gcd && f.gcd > 0) continue;
       if (abilityBlocked(match, me, n)) continue;

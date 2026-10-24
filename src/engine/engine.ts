@@ -1,4 +1,4 @@
-import { ABILITY_MELEE_RANGE, DOT_TICK_FRAMES, EXECUTE_BELOW, GCD_FRAMES, MAX_RESOURCE, RESOURCE_NAMES, type ResolvedAbility } from './abilities';
+import { ABILITY_MELEE_RANGE, ABILITY_SLOTS, DOT_TICK_FRAMES, EXECUTE_BELOW, GCD_FRAMES, MAX_RESOURCE, RESOURCE_NAMES, type ResolvedAbility, type SlotIndex } from './abilities';
 import { BRAND } from './brand';
 import { type Move, type MoveRef, type MoveTable, variationOf } from './moves';
 import {
@@ -100,7 +100,7 @@ export interface Fighter {
   /** Frames of global cooldown left. */
   gcd: number;
   /** Frames left on each of the kit's four abilities. */
-  cooldowns: [number, number, number, number];
+  cooldowns: [number, number, number];
   /** The ability being used, cast or dashed with. */
   ability: number;
   cast: Cast | undefined;
@@ -167,7 +167,7 @@ export interface Inputs {
   /** Held: keep auto-attacking. A single tick of it queues one swing. */
   attack: boolean;
   /** Edge-triggered: the kit's four abilities. */
-  abilities: [boolean, boolean, boolean, boolean];
+  abilities: [boolean, boolean, boolean];
 }
 
 export type Phase = 'intro' | 'fight' | 'finish' | 'ko' | 'roundEnd' | 'matchEnd';
@@ -216,7 +216,7 @@ export interface Match {
 }
 
 export function noInputs(): Inputs {
-  return { left: false, right: false, jump: false, attack: false, abilities: [false, false, false, false] };
+  return { left: false, right: false, jump: false, attack: false, abilities: [false, false, false] };
 }
 
 export const NO_INPUTS: Readonly<Inputs> = Object.freeze(noInputs());
@@ -230,11 +230,11 @@ const KNOCKDOWN_FRAMES = 30;
 const PROJECTILE_Z = 1.25;
 const HP_EASE = 0.08;
 /** How far into the release animation a bolt leaves the hand. */
-const BOLT_AT = 0.3;
-/** Melee abilities connect in this part of their animation. */
-const ABILITY_HIT = { from: 0.3, to: 0.6 };
+const BOLT_AT = 0.22;
+/** Melee abilities connect early in their animation: a short wind-up, then the blow. */
+const ABILITY_HIT = { from: 0.18, to: 0.5 };
 /** Past this fraction of an ability's animation the fighter may act again. */
-const ABILITY_RECOVER = 0.5;
+const ABILITY_RECOVER = 0.45;
 const DODGE_RECOVER = 0.4;
 /** Reach beyond the ability's range once it is already swinging. */
 const REACH_SLACK = 0.4;
@@ -290,7 +290,7 @@ function newFighter(side: 0 | 1, table: MoveTable): Fighter {
     buffered: -1,
     bufferedT: 0,
     gcd: 0,
-    cooldowns: [0, 0, 0, 0],
+    cooldowns: [0, 0, 0],
     ability: 0,
     cast: undefined,
     dash: undefined,
@@ -550,12 +550,12 @@ export function useAbility(match: Match, i: 0 | 1, n: number): boolean {
   // A cast pays its cost and starts its cooldown only when it goes off.
   if (a.cast > 0) {
     f.cast = { ability: n, t: 0, total: a.cast };
-    play(f, 'cast', `cast${n as 0 | 1 | 2 | 3}`);
+    play(f, 'cast', `cast${n as SlotIndex}`);
     return true;
   }
   f.cooldowns[n] = a.cooldown;
   f.resource -= a.cost;
-  const ref: MoveRef = `ability${n as 0 | 1 | 2 | 3}`;
+  const ref: MoveRef = `ability${n as SlotIndex}`;
   switch (a.kind) {
     case 'melee':
       play(f, 'ability', ref);
@@ -572,7 +572,7 @@ export function useAbility(match: Match, i: 0 | 1, n: number): boolean {
     case 'charge':
     case 'rush':
       f.dash = { ability: n, t: 0, fromX: f.x };
-      play(f, 'dash', `cast${n as 0 | 1 | 2 | 3}`);
+      play(f, 'dash', `cast${n as SlotIndex}`);
       return true;
     case 'blink': {
       const away = o.x >= f.x ? -1 : 1;
@@ -695,7 +695,7 @@ function timers(match: Match, i: 0 | 1): void {
   const f = match.fighters[i];
   const kit = match.tables[i].kit;
   if (f.gcd > 0) f.gcd--;
-  for (let n = 0; n < 4; n++) if (f.cooldowns[n]! > 0) f.cooldowns[n]!--;
+  for (let n = 0; n < ABILITY_SLOTS; n++) if (f.cooldowns[n]! > 0) f.cooldowns[n]!--;
   if (f.swingT > 0) f.swingT--;
   if (f.slowT > 0) f.slowT--;
   if (f.evasionT > 0) f.evasionT--;
@@ -740,7 +740,7 @@ function completeCast(match: Match, i: 0 | 1): void {
   f.resource -= a.cost;
   f.cooldowns[n] = a.cooldown;
   f.ability = n;
-  play(f, 'ability', `ability${n as 0 | 1 | 2 | 3}`);
+  play(f, 'ability', `ability${n as SlotIndex}`);
   if (a.kind !== 'bolt') {
     f.hitDone = true;
     fire(match, i, n);
@@ -765,7 +765,7 @@ function dashes(match: Match, i: 0 | 1): void {
   if (!arrived) return;
   const n = f.dash.ability;
   f.dash = undefined;
-  play(f, 'ability', `ability${n as 0 | 1 | 2 | 3}`);
+  play(f, 'ability', `ability${n as SlotIndex}`);
   f.hitDone = true;
   if (inReach(f, o, ABILITY_MELEE_RANGE, true)) {
     strike(match, i, ti, { damage: a.damage, roll: 'none', ability: a, pushback: PUSHBACK.charge, hitstop: 6 }, toward, o.x, 1.3 + o.z);
@@ -842,9 +842,10 @@ function damage(match: Match, ai: 0 | 1, ti: 0 | 1, amount: number, kind: 'damag
     target.fearT = 0;
     play(target, 'idle', 'idle');
   }
-  if (left > 0 && (target.state === 'idle' || target.state === 'walk' || target.state === 'back' || target.state === 'hit' || target.state === 'dodge' || target.state === 'parry')) {
-    play(target, 'hit', kind === 'crit' ? 'crit' : 'hit');
-  }
+  // The wound shows on every blow that lands, unless the target is mid-ability or still has a swing to land.
+  const flinches = target.state === 'idle' || target.state === 'walk' || target.state === 'back' || target.state === 'hit' || target.state === 'dodge' || target.state === 'parry'
+    || (target.state === 'attack' && target.hitDone);
+  if (left > 0 && flinches) play(target, 'hit', kind === 'crit' ? 'crit' : 'hit');
   void attacker;
   return left;
 }
@@ -945,7 +946,7 @@ function strike(match: Match, ai: 0 | 1, ti: 0 | 1, blow: Blow, dir: number, spa
   const wasCasting = target.cast !== undefined;
   if (amount > 0) {
     target.vx = dir * blow.pushback * (outcome === 'block' ? 0.5 : 1);
-    const stop = blow.hitstop + (outcome === 'crit' ? 3 : 0);
+    const stop = blow.hitstop + (outcome === 'crit' ? 4 : 0);
     target.hitstop = Math.max(target.hitstop, stop);
     attacker.hitstop = Math.max(attacker.hitstop, stop);
     spark(match, sparkX, sparkZ, outcome === 'block' ? 'block' : outcome === 'crit' ? 'crit' : blow.roll === 'spell' ? 'spell' : 'hit');
@@ -1024,7 +1025,7 @@ function attacks(match: Match, i: 0 | 1): void {
     }
     if (!inReach(f, target, table.weapon.range + REACH_SLACK, false)) return;
     f.hitDone = true;
-    strike(match, i, ti, { damage: table.weapon.damage, roll: 'melee', ability: undefined, pushback: PUSHBACK.swing, hitstop: 5 }, f.facing, target.x - f.facing * 0.3, 1.3 + target.z);
+    strike(match, i, ti, { damage: table.weapon.damage, roll: 'melee', ability: undefined, pushback: PUSHBACK.swing, hitstop: 6 }, f.facing, target.x - f.facing * 0.3, 1.3 + target.z);
     return;
   }
 
@@ -1047,7 +1048,7 @@ function attacks(match: Match, i: 0 | 1): void {
   if (!inReach(f, target, a.range + REACH_SLACK, a.both)) return;
   f.hitDone = true;
   const dir = target.x >= f.x ? 1 : -1;
-  strike(match, i, ti, { damage: a.damage, roll: 'melee', ability: a, pushback: PUSHBACK.ability, hitstop: 8 }, dir, target.x - dir * 0.3, 1.3 + target.z);
+  strike(match, i, ti, { damage: a.damage, roll: 'melee', ability: a, pushback: PUSHBACK.ability, hitstop: 10 }, dir, target.x - dir * 0.3, 1.3 + target.z);
 }
 
 function projectiles(match: Match): void {

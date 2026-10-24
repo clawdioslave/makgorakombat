@@ -39,7 +39,7 @@ export function fakeMatch(seed = 1, classes: [number, number] = [WARRIOR, WARRIO
   return newMatch([fakeTable(FULL_SET, 'oneHand', {}, classes[0], shields[0]), fakeTable(FULL_SET, 'oneHand', {}, classes[1], shields[1])], seed);
 }
 
-export function inputs(partial: Partial<Omit<Inputs, 'abilities'>> & { abilities?: [boolean, boolean, boolean, boolean]; ability?: number } = {}): Inputs {
+export function inputs(partial: Partial<Omit<Inputs, 'abilities'>> & { abilities?: [boolean, boolean, boolean]; ability?: number } = {}): Inputs {
   const out = { ...noInputs() };
   const { ability, abilities, ...rest } = partial;
   Object.assign(out, rest);

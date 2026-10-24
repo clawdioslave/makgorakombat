@@ -20,7 +20,7 @@ const BONE = '#f4f1e6';
 /** Where a nameplate sits: this far above the feet. */
 const HEAD = 2.3;
 
-const ABILITY_KEYS: readonly InputAction[] = ['ability1', 'ability2', 'ability3', 'ability4'];
+const ABILITY_KEYS: readonly InputAction[] = ['ability1', 'ability2', 'ability3'];
 
 export interface HudOptions {
   /** Which fighters a person plays: a blow they take floats red, as the game shows damage taken. Both by default. */
@@ -395,14 +395,14 @@ function floatingTexts(ctx: CanvasRenderingContext2D, match: Match, at: (p: read
   }
 }
 
-/** Each fighter's four abilities as a row of slots: name, key, cooldown sweep, dimmed when they cannot go. */
+/** Each fighter's abilities as a row of slots: name, key, cooldown sweep, dimmed when they cannot go. */
 function actionBars(ctx: CanvasRenderingContext2D, w: number, h: number, match: Match): void {
   const size = 68;
   const gap = 6;
   const bottom = h - 22;
   match.fighters.forEach((fighter, i) => {
     const kit = match.tables[i]!.kit;
-    const rowWidth = size * 4 + gap * 3;
+    const rowWidth = size * kit.abilities.length + gap * (kit.abilities.length - 1);
     const x0 = i === 0 ? 40 : w - 40 - rowWidth;
     kit.abilities.forEach((ability, n) => {
       const x = x0 + n * (size + gap);

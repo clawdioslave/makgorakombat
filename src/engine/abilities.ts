@@ -2,7 +2,7 @@ import { type Finder, type Move, moveFrom } from './anim';
 import type { Wielding } from './moves';
 
 /*
- * The class kits: four abilities per class, each with a cost in the class's resource, a cooldown,
+ * The class kits: three abilities per class, each with a cost in the class's resource, a cooldown,
  * a cast time, a reach and what it does, resolved to the model's own animations. Frames are at
  * 60 Hz; a cooldown of 90 is 1.5 s. Everything a class can do in the ring is in this file.
  */
@@ -91,8 +91,12 @@ export interface Kit {
   starts: number;
   /** Per frame. */
   regen: number;
-  abilities: [ResolvedAbility, ResolvedAbility, ResolvedAbility, ResolvedAbility];
+  abilities: [ResolvedAbility, ResolvedAbility, ResolvedAbility];
 }
+
+/** Abilities on the bar: the auto-attack and three abilities keep a class simple to play. */
+export const ABILITY_SLOTS = 3;
+export type SlotIndex = 0 | 1 | 2;
 
 export const MAX_RESOURCE = 100;
 /** The global cooldown: 1.5 s. */
@@ -142,7 +146,6 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
       abilities: [
         ability({ id: 'charge', name: 'Charge', short: 'CHARGE', kind: 'charge', cooldown: 15 * S, damage: 5, stun: 60, gain: 20, anims: ['CombatChargeEnd', ...strike], holdAnims: ['CombatChargeLoop', 'Sprint', 'Run', 'Walk'] }),
         ability({ id: 'mortalStrike', name: 'Mortal Strike', short: 'MORTAL', kind: 'melee', cost: 30, cooldown: 6 * S, damage: 18, anims: BIG_2H }),
-        ability({ id: 'whirlwind', name: 'Whirlwind', short: 'WHIRLWIND', kind: 'melee', cost: 25, cooldown: 8 * S, damage: 14, both: true, anims: SPIN }),
         ability({ id: 'execute', name: 'Execute', short: 'EXECUTE', kind: 'melee', cost: 15, damage: 30, execute: true, anims: EXECUTE }),
       ],
     },
@@ -152,14 +155,12 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
         ability({ id: 'crusaderStrike', name: 'Crusader Strike', short: 'CRUSADER', kind: 'melee', cost: 15, cooldown: 4.5 * S, damage: 14, anims: strike }),
         ability({ id: 'hammerOfJustice', name: 'Hammer of Justice', short: 'HAMMER', kind: 'spell', cost: 15, cooldown: 20 * S, range: 3.5, damage: 4, stun: 120, anims: ['PalSpellCast1HUp', ...SPELL] }),
         ability({ id: 'holyLight', name: 'Holy Light', short: 'HOLY LIGHT', kind: 'self', cost: 30, cast: 2 * S, heal: 35, anims: OMNI, holdAnims: ['PalSpellCast1HUp', ...CAST_HOLD] }),
-        ability({ id: 'judgment', name: 'Judgment', short: 'JUDGMENT', kind: 'spell', cost: 20, cooldown: 8 * S, range: 5, damage: 12, anims: ['PalSpellCast1HUp', ...SPELL] }),
       ],
     },
     3: {
       key: 'hunter', name: 'HUNTER', resource: 'focus',
       abilities: [
         ability({ id: 'aimedShot', name: 'Aimed Shot', short: 'AIMED', kind: 'bolt', cost: 35, cast: 1.5 * S, damage: 22, anims: ['AttackBow', 'AttackRifle', 'AttackCrossbow', 'AttackThrown', ...SPELL], holdAnims: ['ReadyBow', 'ReadyRifle', 'ReadyCrossbow', ...CAST_HOLD] }),
-        ability({ id: 'multiShot', name: 'Multi-Shot', short: 'MULTI', kind: 'bolt', cost: 30, cooldown: 6 * S, damage: 12, anims: ['AttackBow', 'AttackRifle', 'AttackCrossbow', 'AttackThrown', ...SPELL] }),
         ability({ id: 'disengage', name: 'Disengage', short: 'DISENGAGE', kind: 'leap', cooldown: 15 * S, gcd: false, anims: ['JumpStart', 'Jump', 'Dodge'] }),
         ability({ id: 'killShot', name: 'Kill Shot', short: 'KILL SHOT', kind: 'bolt', cost: 10, damage: 30, execute: true, anims: ['AttackBow', 'AttackRifle', 'AttackCrossbow', 'AttackThrown', ...SPELL] }),
       ],
@@ -170,7 +171,6 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
         ability({ id: 'sinisterStrike', name: 'Sinister Strike', short: 'SINISTER', kind: 'melee', cost: 40, damage: 12, anims: STRIKE_1H }),
         ability({ id: 'kidneyShot', name: 'Kidney Shot', short: 'KIDNEY', kind: 'melee', cost: 25, cooldown: 20 * S, damage: 6, stun: 120, anims: KICK }),
         ability({ id: 'evasion', name: 'Evasion', short: 'EVASION', kind: 'self', cooldown: 30 * S, gcd: false, evasion: 8 * S, anims: ['Dodge', 'Roll', 'ParryUnarmed'] }),
-        ability({ id: 'eviscerate', name: 'Eviscerate', short: 'EVISCERATE', kind: 'melee', cost: 35, damage: 20, anims: ['CombatEviscerate', 'CombatMutilate', ...STRIKE_1H] }),
       ],
     },
     5: {
@@ -179,7 +179,6 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
         ability({ id: 'mindBlast', name: 'Mind Blast', short: 'MIND BLAST', kind: 'spell', cost: 25, cooldown: 8 * S, cast: 1 * S, damage: 20, anims: ['PriSpellCastBothUp', ...SPELL], holdAnims: CAST_HOLD }),
         ability({ id: 'shadowWordPain', name: 'Shadow Word: Pain', short: 'SW: PAIN', kind: 'spell', cost: 20, dot: { damage: 5, ticks: 5 }, anims: SPELL }),
         ability({ id: 'powerWordShield', name: 'Power Word: Shield', short: 'PW: SHIELD', kind: 'self', cost: 25, cooldown: 10 * S, absorb: 25, anims: ['PriSpellCastBothUp', ...OMNI] }),
-        ability({ id: 'smite', name: 'Smite', short: 'SMITE', kind: 'spell', cost: 15, cast: 1.5 * S, damage: 14, anims: ['PriSpellCastBothUp', ...SPELL], holdAnims: CAST_HOLD }),
       ],
     },
     6: {
@@ -188,7 +187,6 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
         ability({ id: 'icyTouch', name: 'Icy Touch', short: 'ICY TOUCH', kind: 'spell', cooldown: 6 * S, range: 4, damage: 10, slow: 3 * S, gain: 15, anims: SPELL }),
         ability({ id: 'deathStrike', name: 'Death Strike', short: 'DEATH STR', kind: 'melee', cooldown: 6 * S, damage: 16, heal: 10, gain: 15, anims: ['DeathStrike', ...STRIKE_2H] }),
         ability({ id: 'deathCoil', name: 'Death Coil', short: 'DEATH COIL', kind: 'bolt', cost: 40, range: 6, damage: 18, anims: ['LocSpellCastBothFront', ...SPELL] }),
-        ability({ id: 'obliterate', name: 'Obliterate', short: 'OBLITERATE', kind: 'melee', cooldown: 8 * S, damage: 20, gain: 15, anims: BIG_2H }),
       ],
     },
     7: {
@@ -197,14 +195,12 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
         ability({ id: 'lightningBolt', name: 'Lightning Bolt', short: 'LIGHTNING', kind: 'bolt', cost: 15, cast: 1.5 * S, damage: 16, anims: ['ShaSpellCastBothFront', ...SPELL], holdAnims: CAST_HOLD }),
         ability({ id: 'earthShock', name: 'Earth Shock', short: 'EARTH SHK', kind: 'spell', cost: 20, cooldown: 6 * S, range: 5, damage: 10, interrupt: true, anims: ['ShaSpellCastBothFront', ...SPELL] }),
         ability({ id: 'stormstrike', name: 'Stormstrike', short: 'STORMSTR', kind: 'melee', cost: 20, cooldown: 8 * S, damage: 16, anims: ['Stormstrike', ...strike] }),
-        ability({ id: 'flameShock', name: 'Flame Shock', short: 'FLAME SHK', kind: 'spell', cost: 20, cooldown: 6 * S, range: 5, damage: 6, dot: { damage: 4, ticks: 4 }, anims: SPELL }),
       ],
     },
     8: {
       key: 'mage', name: 'MAGE', resource: 'mana',
       abilities: [
         ability({ id: 'frostbolt', name: 'Frostbolt', short: 'FROSTBOLT', kind: 'bolt', cost: 20, cast: 1.5 * S, damage: 16, slow: 4 * S, anims: ['MagSpellCastBothFront', ...SPELL], holdAnims: CAST_HOLD }),
-        ability({ id: 'fireball', name: 'Fireball', short: 'FIREBALL', kind: 'bolt', cost: 25, cast: 2 * S, damage: 24, anims: ['MagSpellCastBothFront', ...SPELL], holdAnims: CAST_HOLD }),
         ability({ id: 'fireBlast', name: 'Fire Blast', short: 'FIRE BLAST', kind: 'spell', cost: 25, cooldown: 8 * S, range: 6, damage: 14, anims: ['MagSpellCastBothFront', ...SPELL] }),
         ability({ id: 'blink', name: 'Blink', short: 'BLINK', kind: 'blink', cost: 15, cooldown: 15 * S, anims: OMNI }),
       ],
@@ -215,7 +211,6 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
         ability({ id: 'shadowBolt', name: 'Shadow Bolt', short: 'SHADOW BLT', kind: 'bolt', cost: 20, cast: 1.5 * S, damage: 18, anims: ['LocSpellCastBothFront', ...SPELL], holdAnims: CAST_HOLD }),
         ability({ id: 'corruption', name: 'Corruption', short: 'CORRUPTION', kind: 'spell', cost: 20, dot: { damage: 6, ticks: 5 }, anims: SPELL }),
         ability({ id: 'fear', name: 'Fear', short: 'FEAR', kind: 'spell', cost: 20, cooldown: 20 * S, cast: 1 * S, range: 6, fear: 150, anims: ['LocSpellCastBothFront', ...OMNI], holdAnims: CAST_HOLD }),
-        ability({ id: 'immolate', name: 'Immolate', short: 'IMMOLATE', kind: 'spell', cost: 20, cast: 1 * S, damage: 8, dot: { damage: 4, ticks: 4 }, anims: SPELL, holdAnims: CAST_HOLD }),
       ],
     },
     10: {
@@ -223,7 +218,6 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
       abilities: [
         ability({ id: 'tigerPalm', name: 'Tiger Palm', short: 'TIGER PALM', kind: 'melee', cost: 25, damage: 10, anims: ['CombatUnarmed01', 'AttackUnarmed', 'SpecialUnarmed', ...STRIKE_1H] }),
         ability({ id: 'risingSunKick', name: 'Rising Sun Kick', short: 'RISING SUN', kind: 'melee', cost: 30, cooldown: 8 * S, damage: 18, anims: ['RisingSunKick', 'FlyingKick', 'RoundHouseKick', 'Kick', ...STRIKE_1H] }),
-        ability({ id: 'spinningCraneKick', name: 'Spinning Crane Kick', short: 'CRANE KICK', kind: 'melee', cost: 40, cooldown: 10 * S, damage: 14, both: true, anims: ['SpinningKick', 'Whirlwind', 'RoundHouseKick', ...SPIN] }),
         ability({ id: 'legSweep', name: 'Leg Sweep', short: 'LEG SWEEP', kind: 'melee', cost: 25, cooldown: 20 * S, damage: 6, stun: 120, anims: KICK }),
       ],
     },
@@ -233,7 +227,6 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
         ability({ id: 'wrath', name: 'Wrath', short: 'WRATH', kind: 'bolt', cost: 15, cast: 1.5 * S, damage: 14, anims: SPELL, holdAnims: ['DruReadySpellCast', ...CAST_HOLD] }),
         ability({ id: 'moonfire', name: 'Moonfire', short: 'MOONFIRE', kind: 'spell', cost: 20, damage: 8, dot: { damage: 4, ticks: 4 }, anims: OMNI }),
         ability({ id: 'rake', name: 'Rake', short: 'RAKE', kind: 'melee', cost: 25, damage: 8, dot: { damage: 4, ticks: 3 }, anims: ['SpecialUnarmed', 'AttackUnarmed', ...STRIKE_1H] }),
-        ability({ id: 'regrowth', name: 'Regrowth', short: 'REGROWTH', kind: 'self', cost: 25, cast: 2 * S, heal: 30, anims: OMNI, holdAnims: ['DruReadySpellCast', ...CAST_HOLD] }),
       ],
     },
     12: {
@@ -242,7 +235,6 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
         ability({ id: 'chaosStrike', name: 'Chaos Strike', short: 'CHAOS STR', kind: 'melee', cost: 40, damage: 20, anims: ['CombatAbilityGlv01', 'CombatAbilityDualWield01', ...STRIKE_1H] }),
         ability({ id: 'felRush', name: 'Fel Rush', short: 'FEL RUSH', kind: 'rush', cooldown: 10 * S, range: 4, damage: 10, gain: 10, anims: ['FelRushEnd', ...STRIKE_1H], holdAnims: ['FelRushLoop', 'DHCombatSprint', 'Sprint', 'Run', 'Walk'] }),
         ability({ id: 'bladeDance', name: 'Blade Dance', short: 'BLADE DNC', kind: 'melee', cost: 35, cooldown: 9 * S, damage: 16, both: true, anims: ['DHBladeDance1', ...SPIN] }),
-        ability({ id: 'throwGlaive', name: 'Throw Glaive', short: 'GLAIVE', kind: 'bolt', cooldown: 9 * S, range: 7, damage: 10, gain: 10, anims: ['GlvThrownOff', 'AttackThrown', ...SPELL] }),
       ],
     },
     13: {
@@ -250,7 +242,6 @@ function classKits(twoHand: boolean): Record<number, { key: string; name: string
       abilities: [
         ability({ id: 'livingFlame', name: 'Living Flame', short: 'LIVING FLM', kind: 'bolt', cost: 15, cast: 1.5 * S, damage: 16, anims: SPELL, holdAnims: CAST_HOLD }),
         ability({ id: 'fireBreath', name: 'Fire Breath', short: 'FIRE BRTH', kind: 'spell', cost: 25, cooldown: 12 * S, range: 3.5, damage: 20, dot: { damage: 3, ticks: 3 }, anims: ['ChannelCastDirected', ...SPELL] }),
-        ability({ id: 'azureStrike', name: 'Azure Strike', short: 'AZURE', kind: 'spell', cost: 15, range: 5, damage: 10, anims: SPELL }),
         ability({ id: 'hover', name: 'Hover', short: 'HOVER', kind: 'leap', cooldown: 15 * S, gcd: false, anims: ['JumpStart', 'Jump', 'Dodge'] }),
       ],
     },

@@ -1,7 +1,7 @@
 import { cpuInputs } from './cpu';
 import { type Inputs, type Match, noInputs } from './engine';
 
-export type InputAction = 'left' | 'right' | 'jump' | 'attack' | 'ability1' | 'ability2' | 'ability3' | 'ability4';
+export type InputAction = 'left' | 'right' | 'jump' | 'attack' | 'ability1' | 'ability2' | 'ability3';
 export type InputSource = 'keyboard' | 'gamepad' | 'cpu';
 
 /**
@@ -17,7 +17,6 @@ export const KEYS: readonly [Record<InputAction, readonly string[]>, Record<Inpu
     ability1: ['KeyK'],
     ability2: ['KeyL'],
     ability3: ['KeyU'],
-    ability4: ['KeyI'],
   },
   {
     left: ['ArrowLeft'],
@@ -27,7 +26,6 @@ export const KEYS: readonly [Record<InputAction, readonly string[]>, Record<Inpu
     ability1: ['Period', 'Numpad1'],
     ability2: ['Slash', 'Numpad2'],
     ability3: ['ShiftRight', 'Numpad3'],
-    ability4: ['Quote', 'Numpad4'],
   },
 ];
 
@@ -36,10 +34,10 @@ export const MENU_KEYS = { rematch: 'Enter', back: 'Escape', debug: 'F3' } as co
 
 /** Short labels for the HUD's controls hint and action bar. */
 export const KEY_LABELS: Readonly<Record<string, string>> = {
-  KeyA: 'A', KeyD: 'D', KeyW: 'W', KeyU: 'U', KeyI: 'I', KeyJ: 'J', KeyK: 'K', KeyL: 'L',
+  KeyA: 'A', KeyD: 'D', KeyW: 'W', KeyU: 'U', KeyJ: 'J', KeyK: 'K', KeyL: 'L',
   ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓',
-  ShiftRight: 'R SHIFT', Numpad0: 'NUM 0', Numpad1: 'NUM 1', Numpad2: 'NUM 2', Numpad3: 'NUM 3', Numpad4: 'NUM 4',
-  Comma: ',', Period: '.', Slash: '/', Quote: "'",
+  ShiftRight: 'R SHIFT', Numpad0: 'NUM 0', Numpad1: 'NUM 1', Numpad2: 'NUM 2', Numpad3: 'NUM 3',
+  Comma: ',', Period: '.', Slash: '/',
 };
 
 /** The label of a player's first key for an action. */
@@ -48,22 +46,21 @@ export function keyLabel(player: 0 | 1, action: InputAction): string {
   return KEY_LABELS[code] ?? code;
 }
 
-/** Standard-mapping gamepad buttons per action: abilities on A B X Y, auto-attack on the right trigger, jump on the bumpers or up. */
+/** Standard-mapping gamepad buttons per action: abilities on A B X, auto-attack on the right trigger, jump on Y, the bumpers or up. */
 export const GAMEPAD_BUTTONS: Record<InputAction, readonly number[]> = {
   left: [14],
   right: [15],
-  jump: [4, 5, 12],
+  jump: [3, 4, 5, 12],
   attack: [7, 6],
   ability1: [0],
   ability2: [1],
   ability3: [2],
-  ability4: [3],
 };
 
-const ACTIONS: readonly InputAction[] = ['left', 'right', 'jump', 'attack', 'ability1', 'ability2', 'ability3', 'ability4'];
-const EDGE: readonly InputAction[] = ['jump', 'ability1', 'ability2', 'ability3', 'ability4'];
-const ABILITIES: readonly InputAction[] = ['ability1', 'ability2', 'ability3', 'ability4'];
-const PREVENT = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'Tab', 'Quote', 'Slash']);
+const ACTIONS: readonly InputAction[] = ['left', 'right', 'jump', 'attack', 'ability1', 'ability2', 'ability3'];
+const EDGE: readonly InputAction[] = ['jump', 'ability1', 'ability2', 'ability3'];
+const ABILITIES: readonly InputAction[] = ['ability1', 'ability2', 'ability3'];
+const PREVENT = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'Tab', 'Slash']);
 
 type Listener = (event: KeyboardEvent) => void;
 
@@ -76,7 +73,7 @@ interface Target {
 type Held = Record<InputAction, boolean>;
 
 function heldNone(): Held {
-  return { left: false, right: false, jump: false, attack: false, ability1: false, ability2: false, ability3: false, ability4: false };
+  return { left: false, right: false, jump: false, attack: false, ability1: false, ability2: false, ability3: false };
 }
 
 /**

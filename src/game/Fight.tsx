@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { type Inputs, type Match, newMatch, poseOf, tick } from '../engine/engine';
 import { InputReader } from '../engine/input';
 import { type MoveTable, resolveMoves } from '../engine/moves';
+import { type FighterView, fighterView } from '../engine/view';
 import { CAMERA, TICK_MS } from '../engine/stage';
 import { Arena } from './arena';
 import type { BuiltFighter } from './fighters';
@@ -63,8 +64,9 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
     void mixer.load(0, fighters[0].sounds);
     void mixer.load(1, fighters[1].sounds);
     // For scripts and the console: the live match and what the fight sounds like.
-    (window as unknown as { mk?: { match: () => Match; sounds: () => unknown } }).mk = {
+    (window as unknown as { mk?: { match: () => Match; view: (i: 0 | 1) => FighterView; sounds: () => unknown } }).mk = {
       match: () => match.current!,
+      view: (i) => fighterView(match.current!, i),
       sounds: () => ({ played: mixer.played, sides: mixer.summary() }),
     };
     const input = new InputReader();
