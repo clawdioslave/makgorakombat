@@ -76,6 +76,12 @@ function tableOf(fighter: BuiltFighter): MoveTable {
   return resolveMoves(result.scene.animations, result.wielding, champion.classId, shield);
 }
 
+/** How high a fighter's head is, standing: the model's helm point, at its own size; a little under the top of its box without one. */
+function headHeight(fighter: BuiltFighter): number {
+  const { head, bounds } = fighter.result.scene;
+  return head ? head[2] : (bounds.max[2] - bounds.min[2]) * 0.88;
+}
+
 export function Fight({ fighters, stage, p2, onBack }: FightProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
@@ -123,6 +129,8 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
         held = on;
       },
     };
+    // Each fighter's head, standing, at its own size: where its nameplate hangs and its words rise.
+    const heads: [number, number] = [headHeight(fighters[0]), headHeight(fighters[1])];
     const input = new InputReader();
     // The keys are read from the window, not the stage element: a click on the DOM frames or anywhere
     // else must not leave the keyboard dead. The stage still takes focus so the arrows do not scroll.
@@ -188,7 +196,7 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
       const note = debugRef.current
         ? `engine ${times.engine.toFixed(2)} ms · pose+draw ${times.pose.toFixed(2)} ms · hud ${times.draw.toFixed(2)} ms · sounds ${mixer.played}`
         : mutedRef.current ? 'MUTED · M' : undefined;
-      drawHud(ctx, hud.width, hud.height, current, names, (point) => ring.project(camera, point), { human: [true, p2 !== 'cpu'], debug: note, sources: [input.source(0), input.source(1)], anchor: ring.anchor });
+      drawHud(ctx, hud.width, hud.height, current, names, (point) => ring.project(camera, point), { human: [true, p2 !== 'cpu'], debug: note, sources: [input.source(0), input.source(1)], anchor: ring.anchor, heads });
       // The HUD's own time, shown the next frame.
       times.draw = times.draw * 0.9 + (performance.now() - t2) * 0.1;
     };

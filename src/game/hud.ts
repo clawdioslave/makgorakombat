@@ -3,7 +3,7 @@ import type { FloatingText, Match } from '../engine/engine';
 import { directionOf, type FatalityEffect, impactFrame, type SequenceToken, STEP_FRAMES } from '../engine/fatalities';
 import { actionLabel, type InputSource } from '../engine/input';
 import { FINISH_FRAMES, HALF, HP, ROUND_FRAMES } from '../engine/stage';
-import type { AnchorAt } from './fx';
+import { type AnchorAt, ATTACH } from './fx';
 import { drawSpells } from './fx2d';
 
 /*
@@ -22,8 +22,14 @@ const SERIF = "'Cinzel', 'Palatino', serif";
 const HEAVY = "'Metal Mania', 'Impact', sans-serif";
 const GOLD = '#ffd100';
 const BONE = '#f4f1e6';
-/** Where a nameplate sits: this far above the feet. */
-const HEAD = 2.3;
+/** Where the engine floats words over a fighter: this far above the feet, as for a human. */
+const TEXT_Z = 2.3;
+/** A human male's head, standing: the heights the engine uses (a spark at the chest, a word over the head) are his. */
+const HUMAN_HEAD = 1.85;
+/** A nameplate sits this far above the head, for a human; more for a bigger body. */
+const PLATE_ABOVE = 0.45;
+/** The highest a nameplate goes, in HUD units: under the unit frames, as the game keeps a plate on screen when its head is not. */
+const PLATE_TOP = 175;
 
 export interface HudOptions {
   /** Which fighters a person plays: a blow they take floats red, as the game shows damage taken. Both by default. */
@@ -33,6 +39,47 @@ export interface HudOptions {
   sources?: [InputSource, InputSource];
   /** The fighters' attachment points this frame (hands, chest), for the spells to start and land on. */
   anchor?: AnchorAt;
+  /** Each fighter's head, standing, in yards above the feet at its own size; a human's when not given. */
+  heads?: [number, number];
+}
+
+/**
+ * Where each fighter's body is, at its own size: a gnome's head is under a yard up, Cairne's near
+ * three. Heights the engine gives for a human (a spark at the chest, a word over the head) are
+ * stretched to the fighter they concern.
+ */
+interface Bodies {
+  /** Standing head height above the feet. */
+  head(i: 0 | 1): number;
+  /** Height over a human's. */
+  size(i: 0 | 1): number;
+  /** Where the eyes are this frame: the posed helm point, following the head through a cast; the standing head without one. */
+  eyes(i: 0 | 1): readonly [number, number, number];
+  /** The chest this frame. */
+  chest(i: 0 | 1): readonly [number, number, number];
+  /** The nameplate's height above the feet. */
+  plate(i: 0 | 1): number;
+  /** The fighter nearest x: whose body a spark is on. */
+  nearest(x: number): 0 | 1;
+}
+
+function bodiesOf(match: Match, heads: [number, number], anchor: AnchorAt): Bodies {
+  const head = (i: 0 | 1) => heads[i];
+  const size = (i: 0 | 1) => heads[i] / HUMAN_HEAD;
+  return {
+    head,
+    size,
+    eyes: (i) => {
+      const f = match.fighters[i];
+      return anchor(i, ATTACH.helm) ?? anchor(i, ATTACH.head) ?? [f.x, 0, f.z + head(i)];
+    },
+    chest: (i) => {
+      const f = match.fighters[i];
+      return anchor(i, ATTACH.chest) ?? [f.x, 0, f.z + 1.3 * size(i)];
+    },
+    plate: (i) => head(i) + PLATE_ABOVE * size(i),
+    nearest: (x) => (Math.abs(match.fighters[0].x - x) <= Math.abs(match.fighters[1].x - x) ? 0 : 1),
+  };
 }
 
 export function drawHud(ctx: CanvasRenderingContext2D, width: number, height: number, match: Match, names: [string, string], project: Project, options: HudOptions = {}): void {
@@ -51,13 +98,15 @@ export function drawHud(ctx: CanvasRenderingContext2D, width: number, height: nu
     return p ? [p[0] / unit, p[1] / unit] : undefined;
   };
 
+  const bodies = bodiesOf(match, options.heads ?? [HUMAN_HEAD, HUMAN_HEAD], options.anchor ?? (() => undefined));
+
   groundLine(ctx, at);
   hurtFlash(ctx, w, h, match, human);
-  nameplates(ctx, match, names, at);
-  sparks(ctx, match, at);
+  nameplates(ctx, match, names, at, bodies);
+  sparks(ctx, match, at, bodies);
   drawSpells(ctx, match, at, options.anchor ?? (() => undefined));
-  fatalityEffects(ctx, w, h, match, at);
-  floatingTexts(ctx, match, at, human);
+  fatalityEffects(ctx, w, h, match, at, bodies);
+  floatingTexts(ctx, match, at, human, bodies);
   sequencePrompt(ctx, w, h, match, sources);
   cinematic(ctx, w, h, match);
   banner(ctx, w, h, match);
@@ -90,14 +139,16 @@ function groundLine(ctx: CanvasRenderingContext2D, at: (p: readonly [number, num
 }
 
 /** A thin plate over each head: the name, a sliver of health, the cast bar while casting, stars while stunned. */
-function nameplates(ctx: CanvasRenderingContext2D, match: Match, names: [string, string], at: (p: readonly [number, number, number]) => [number, number] | undefined): void {
+function nameplates(ctx: CanvasRenderingContext2D, match: Match, names: [string, string], at: (p: readonly [number, number, number]) => [number, number] | undefined, bodies: Bodies): void {
   // The scene plays without plates.
   if (match.fatality && (match.phase === 'fatality' || match.phase === 'ko')) return;
   match.fighters.forEach((fighter, i) => {
     if (fighter.state === 'death') return;
-    const head = at([fighter.x, 0, HEAD + fighter.z]);
+    // Over the standing head, as the game hangs a nameplate: it does not bob with the animation.
+    const head = at([fighter.x, 0, bodies.plate(i as 0 | 1) + fighter.z]);
     if (!head) return;
-    const [hx, hy] = head;
+    const hx = head[0];
+    const hy = Math.max(PLATE_TOP, head[1]);
     const width = 96;
     ctx.font = `700 12px ${SERIF}`;
     ctx.textAlign = 'center';
@@ -172,9 +223,12 @@ function hurtFlash(ctx: CanvasRenderingContext2D, w: number, h: number, match: M
 }
 
 /** Sparks where a blow landed: yellow hit, orange crit, blue-white block, silver parry, violet spell. */
-function sparks(ctx: CanvasRenderingContext2D, match: Match, at: (p: readonly [number, number, number]) => [number, number] | undefined): void {
+function sparks(ctx: CanvasRenderingContext2D, match: Match, at: (p: readonly [number, number, number]) => [number, number] | undefined, bodies: Bodies): void {
   for (const spark of match.sparks) {
-    const p = at([spark.x, 0, spark.z]);
+    // The engine puts a spark at a human's chest height; it lands on the body it struck, at that body's size.
+    const on = bodies.nearest(spark.x);
+    const feet = match.fighters[on].z;
+    const p = at([spark.x, 0, feet + (spark.z - feet) * bodies.size(on)]);
     if (!p) continue;
     const [sx, sy] = p;
     const life = Math.max(0, 1 - spark.t / Math.max(1, spark.life));
@@ -262,7 +316,7 @@ function styleOf(text: FloatingText, human: [boolean, boolean]): TextStyle {
  * little left and right so hits that land together do not overlap, and fade over 1.2 s. A crit
  * arrives large and bounces into place.
  */
-function floatingTexts(ctx: CanvasRenderingContext2D, match: Match, at: (p: readonly [number, number, number]) => [number, number] | undefined, human: [boolean, boolean]): void {
+function floatingTexts(ctx: CanvasRenderingContext2D, match: Match, at: (p: readonly [number, number, number]) => [number, number] | undefined, human: [boolean, boolean], bodies: Bodies): void {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   // Texts born on the same frame over the same fighter stack up instead of overlapping.
@@ -274,8 +328,11 @@ function floatingTexts(ctx: CanvasRenderingContext2D, match: Match, at: (p: read
     const key = `${text.side}:${text.t}`;
     const slot = stack[key] ?? 0;
     stack[key] = slot + 1;
-    const p = at([text.x, 0, text.z]);
-    if (!p) continue;
+    // The engine floats a word at a human's head; it rises off this fighter's nameplate instead.
+    const raw = at([text.x, 0, text.z - TEXT_Z + bodies.plate(text.side)]);
+    if (!raw) continue;
+    // Off a nameplate kept on screen, the words start from where the plate is drawn.
+    const p: [number, number] = [raw[0], Math.max(PLATE_TOP, raw[1])];
     const born = match.frame - text.t;
     // The fan: each text takes a lane from -2 to 2 by its birth frame, so a stream of hits spreads out.
     const lane = ((born * 7 + slot * 3) % 5) - 2;
@@ -470,21 +527,22 @@ function cinematic(ctx: CanvasRenderingContext2D, w: number, h: number, match: M
 }
 
 /** The beat's effect, over the pair, in the class's colour. */
-function fatalityEffects(ctx: CanvasRenderingContext2D, w: number, h: number, match: Match, at: At): void {
+function fatalityEffects(ctx: CanvasRenderingContext2D, w: number, h: number, match: Match, at: At, bodies: Bodies): void {
   const run = match.fatality;
   const winner = match.roundWinner;
   if (!run || winner === undefined || match.phase !== 'fatality') return;
   const spec = match.tables[winner].fatality.spec;
   const beat = spec.beats[run.beat];
   if (!beat?.effect) return;
-  const wf = match.fighters[winner];
   const lf = match.fighters[winner === 0 ? 1 : 0];
+  const loser = winner === 0 ? 1 : 0;
+  // Each spot on the body itself: the eyes where the posed head is (Eye Beam, fire from the mouth), the chests, the top of the loser's head.
   const spots = {
-    winner: at([wf.x, 0, 1.3 + wf.z]),
-    head: at([wf.x, 0, 1.9 + wf.z]),
-    loser: at([lf.x, 0, 1.2 + lf.z]),
+    winner: at(bodies.chest(winner)),
+    head: at(bodies.eyes(winner)),
+    loser: at(bodies.chest(loser)),
     feet: at([lf.x, 0, 0]),
-    top: at([lf.x, 0, 2.2 + lf.z]),
+    top: at([lf.x, 0, lf.z + bodies.head(loser) + 0.3 * bodies.size(loser)]),
   };
   if (!spots.winner || !spots.head || !spots.loser || !spots.feet || !spots.top) return;
   effect(ctx, w, h, beat.effect, spec.colour, run.t / beat.frames, match.frame, spots as Record<keyof typeof spots, [number, number]>);
