@@ -1,4 +1,5 @@
-import { type Inputs, type Match, nextRandom, noInputs } from './engine';
+import { abilityBlocked, type Inputs, type Match, nextRandom, noInputs } from './engine';
+import { FINISH_FRAMES, HALF } from './stage';
 
 /** How often the CPU makes up its mind, in frames; it holds its inputs in between. */
 export const CPU_DECIDE_FRAMES = 8;
@@ -10,13 +11,20 @@ export const CPU_DECIDE_FRAMES = 8;
 export function cpuInputs(match: Match, me: 0 | 1): Inputs {
   const memory = match.cpu[me];
   if (match.frame < memory.next) {
-    // Presses are edge-triggered: only the decision tick carries them.
-    return { ...memory.held, jump: false, light: false, heavy: false, special: false };
+    // Presses are edge-triggered: only the decision tick carries them. The attack key stays held.
+    return { ...memory.held, jump: false, abilities: [false, false, false, false] };
   }
   const decision = decide(match, me);
   memory.held = decision;
   memory.next = match.frame + CPU_DECIDE_FRAMES;
-  return { ...decision };
+  return { ...decision, abilities: [...decision.abilities] };
+}
+
+/** Does this kit fight from a distance? Two or more spells or bolts, or a ranged weapon. */
+function isCaster(match: Match, me: 0 | 1): boolean {
+  const table = match.tables[me];
+  if (table.weapon.ranged) return true;
+  return table.kit.abilities.filter((a) => a.kind === 'bolt' || a.kind === 'spell').length >= 2;
 }
 
 function decide(match: Match, me: 0 | 1): Inputs {
@@ -24,10 +32,9 @@ function decide(match: Match, me: 0 | 1): Inputs {
   const f = match.fighters[me];
   const opp = match.fighters[me === 0 ? 1 : 0];
   const table = match.tables[me];
+  const kit = table.kit;
   const toward: 1 | -1 = opp.x >= f.x ? 1 : -1;
   const dist = Math.abs(opp.x - f.x);
-  const lightRange = table.moves.light.hit?.range ?? 2.0;
-  const heavyRange = table.moves.heavy.hit?.range ?? 2.3;
   const walkIn = () => {
     if (toward > 0) out.right = true;
     else out.left = true;
@@ -36,48 +43,105 @@ function decide(match: Match, me: 0 | 1): Inputs {
     if (toward > 0) out.left = true;
     else out.right = true;
   };
+  const cornered = Math.abs(f.x) > HALF - 0.6 && toward * f.x < 0;
+  const press = (n: number) => {
+    out.abilities[n] = true;
+  };
+  /** Abilities that would go right now, by index. */
+  const usable = (): number[] => {
+    const list: number[] = [];
+    for (let n = 0; n < 4; n++) {
+      const a = kit.abilities[n]!;
+      if (a.gcd && f.gcd > 0) continue;
+      if (abilityBlocked(match, me, n)) continue;
+      list.push(n);
+    }
+    return list;
+  };
 
   if (match.phase !== 'fight' && match.phase !== 'finish') return out;
-  if (f.state === 'death' || f.state === 'dazed' || f.state === 'knockdown') return out;
+  if (f.state === 'death' || f.state === 'dazed' || f.state === 'knockdown' || f.state === 'stun' || f.state === 'fear' || f.state === 'dash') return out;
+  // Let a cast finish.
+  if (f.state === 'cast') return out;
 
-  // The finish: close in and go for the heavy.
+  // The finish: close in and end it with an ability; failing that, with a plain blow.
   if (match.phase === 'finish') {
-    if (opp.state === 'dazed') {
-      if (dist <= heavyRange * 0.9) out.heavy = true;
-      else walkIn();
+    if (opp.state !== 'dazed') return out;
+    const ready = usable().filter((n) => kit.abilities[n]!.kind !== 'self' && kit.abilities[n]!.kind !== 'blink' && kit.abilities[n]!.kind !== 'leap');
+    if (ready.length > 0) {
+      press(ready[Math.floor(nextRandom(match) * ready.length)]!);
+      return out;
     }
+    if (dist > table.weapon.range * 0.9 && !table.weapon.ranged) walkIn();
+    else if (match.phaseT > FINISH_FRAMES * 0.55) out.attack = true;
     return out;
   }
 
-  // Something flying at me: jump it or block it.
-  const incoming = match.projectiles.find((p) => p.owner !== me && Math.sign(p.vx) === Math.sign(f.x - p.x) && Math.abs(p.x - f.x) < 2.2);
-  if (incoming) {
-    if (nextRandom(match) < 0.5) out.jump = true;
-    else out.block = true;
+  // Something flying at me: jump it, usually.
+  const incoming = match.projectiles.find((p) => p.owner !== me && Math.sign(p.vx) === Math.sign(f.x - p.x) && Math.abs(p.x - f.x) < 2.4);
+  if (incoming && !f.airborne && nextRandom(match) < 0.6) {
+    out.jump = true;
     return out;
   }
 
-  // The opponent is swinging at me from close by.
-  if (opp.state === 'attack' && dist < heavyRange + 0.3) {
-    if (nextRandom(match) < 0.7) {
-      out.block = true;
+  // The opponent is casting and I can stop them.
+  if (opp.state === 'cast') {
+    const kick = usable().find((n) => kit.abilities[n]!.interrupt);
+    if (kick !== undefined && nextRandom(match) < 0.6) {
+      press(kick);
       return out;
     }
   }
 
-  if (dist > lightRange) {
-    if (dist > 4.5 && f.cooldown === 0 && nextRandom(match) < 0.3) {
-      out.special = true;
+  const caster = isCaster(match, me);
+  const ready = usable();
+  if (ready.length > 0 && nextRandom(match) < 0.7) {
+    // Finish them when it is on the table; a gap-closer when far; otherwise anything that fits the moment.
+    const execute = ready.find((n) => kit.abilities[n]!.execute);
+    const charge = ready.find((n) => kit.abilities[n]!.kind === 'charge' || kit.abilities[n]!.kind === 'rush');
+    const fitting = ready.filter((n) => {
+      const a = kit.abilities[n]!;
+      switch (a.kind) {
+        case 'self':
+          return (a.heal > 0 && f.hp < 55) || (a.absorb > 0 && f.absorb === 0 && f.hp < 80) || (a.evasion > 0 && (opp.state === 'attack' || opp.state === 'ability'));
+        case 'blink':
+        case 'leap':
+          return dist < 2.2 && !cornered && nextRandom(match) < 0.5;
+        case 'charge':
+        case 'rush':
+          return dist > 3;
+        default:
+          return true;
+      }
+    });
+    if (execute !== undefined) press(execute);
+    else if (charge !== undefined && dist > 3) press(charge);
+    else if (fitting.length > 0) press(fitting[Math.floor(nextRandom(match) * fitting.length)]!);
+    if (out.abilities.some(Boolean)) {
+      if (table.weapon.ranged || dist <= table.weapon.range) out.attack = true;
       return out;
     }
+  }
+
+  if (caster) {
+    // Keep the distance: back off from a melee opponent, come in when too far to reach them.
+    if (table.weapon.ranged) out.attack = dist <= table.weapon.range;
+    if (dist < 2.4 && !cornered) {
+      if (nextRandom(match) < 0.8) backOff();
+      else out.attack = true;
+    } else if (dist > 6.5) walkIn();
+    else if (dist < 2.4) out.attack = true;
+    return out;
+  }
+
+  // A melee kit: run in with the attack on, swing, step back now and then.
+  out.attack = true;
+  if (dist > table.weapon.range * 0.9) {
     walkIn();
     return out;
   }
-
   const r = nextRandom(match);
-  if (r < 0.55) out.light = true;
-  else if (r < 0.8) out.heavy = true;
-  else if (r < 0.9) backOff();
-  else if (r < 0.95) out.jump = true;
+  if (r < 0.1) backOff();
+  else if (r < 0.15) out.jump = true;
   return out;
 }

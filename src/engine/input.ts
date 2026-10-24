@@ -1,56 +1,69 @@
 import { cpuInputs } from './cpu';
 import { type Inputs, type Match, noInputs } from './engine';
 
-export type InputAction = keyof Inputs;
+export type InputAction = 'left' | 'right' | 'jump' | 'attack' | 'ability1' | 'ability2' | 'ability3' | 'ability4';
 export type InputSource = 'keyboard' | 'gamepad' | 'cpu';
 
-/** KeyboardEvent.code values per player and action. Exported so the UI can show the controls. */
+/**
+ * KeyboardEvent.code values per player and action. Exported so the UI can show the controls.
+ * Blocking is passive, as in the game: a shield blocks and a weapon parries on the hit table.
+ */
 export const KEYS: readonly [Record<InputAction, readonly string[]>, Record<InputAction, readonly string[]>] = [
   {
     left: ['KeyA'],
     right: ['KeyD'],
     jump: ['KeyW'],
-    block: ['KeyU'],
-    light: ['KeyJ'],
-    heavy: ['KeyK'],
-    special: ['KeyL'],
+    attack: ['KeyJ'],
+    ability1: ['KeyK'],
+    ability2: ['KeyL'],
+    ability3: ['KeyU'],
+    ability4: ['KeyI'],
   },
   {
     left: ['ArrowLeft'],
     right: ['ArrowRight'],
     jump: ['ArrowUp'],
-    block: ['ShiftRight', 'Numpad0'],
-    light: ['Comma', 'Numpad1'],
-    heavy: ['Period', 'Numpad2'],
-    special: ['Slash', 'Numpad3'],
+    attack: ['Comma', 'Numpad0'],
+    ability1: ['Period', 'Numpad1'],
+    ability2: ['Slash', 'Numpad2'],
+    ability3: ['ShiftRight', 'Numpad3'],
+    ability4: ['Quote', 'Numpad4'],
   },
 ];
 
 /** Keys the screens handle themselves. */
 export const MENU_KEYS = { rematch: 'Enter', back: 'Escape', debug: 'F3' } as const;
 
-/** Short labels for the HUD's controls hint. */
+/** Short labels for the HUD's controls hint and action bar. */
 export const KEY_LABELS: Readonly<Record<string, string>> = {
-  KeyA: 'A', KeyD: 'D', KeyW: 'W', KeyU: 'U', KeyJ: 'J', KeyK: 'K', KeyL: 'L',
+  KeyA: 'A', KeyD: 'D', KeyW: 'W', KeyU: 'U', KeyI: 'I', KeyJ: 'J', KeyK: 'K', KeyL: 'L',
   ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓',
-  ShiftRight: 'R SHIFT', Numpad0: 'NUM 0', Numpad1: 'NUM 1', Numpad2: 'NUM 2', Numpad3: 'NUM 3',
-  Comma: ',', Period: '.', Slash: '/',
+  ShiftRight: 'R SHIFT', Numpad0: 'NUM 0', Numpad1: 'NUM 1', Numpad2: 'NUM 2', Numpad3: 'NUM 3', Numpad4: 'NUM 4',
+  Comma: ',', Period: '.', Slash: '/', Quote: "'",
 };
 
-/** Standard-mapping gamepad buttons per action (plus the left stick / d-pad for left and right). */
+/** The label of a player's first key for an action. */
+export function keyLabel(player: 0 | 1, action: InputAction): string {
+  const code = KEYS[player][action][0] ?? '';
+  return KEY_LABELS[code] ?? code;
+}
+
+/** Standard-mapping gamepad buttons per action: abilities on A B X Y, auto-attack on the right trigger, jump on the bumpers or up. */
 export const GAMEPAD_BUTTONS: Record<InputAction, readonly number[]> = {
   left: [14],
   right: [15],
-  jump: [3, 12],
-  block: [4, 5, 6, 7],
-  light: [0],
-  heavy: [1],
-  special: [2],
+  jump: [4, 5, 12],
+  attack: [7, 6],
+  ability1: [0],
+  ability2: [1],
+  ability3: [2],
+  ability4: [3],
 };
 
-const ACTIONS: readonly InputAction[] = ['left', 'right', 'jump', 'block', 'light', 'heavy', 'special'];
-const EDGE: readonly InputAction[] = ['jump', 'light', 'heavy', 'special'];
-const PREVENT = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'Tab']);
+const ACTIONS: readonly InputAction[] = ['left', 'right', 'jump', 'attack', 'ability1', 'ability2', 'ability3', 'ability4'];
+const EDGE: readonly InputAction[] = ['jump', 'ability1', 'ability2', 'ability3', 'ability4'];
+const ABILITIES: readonly InputAction[] = ['ability1', 'ability2', 'ability3', 'ability4'];
+const PREVENT = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'Tab', 'Quote', 'Slash']);
 
 type Listener = (event: KeyboardEvent) => void;
 
@@ -63,14 +76,15 @@ interface Target {
 type Held = Record<InputAction, boolean>;
 
 function heldNone(): Held {
-  return { left: false, right: false, jump: false, block: false, light: false, heavy: false, special: false };
+  return { left: false, right: false, jump: false, attack: false, ability1: false, ability2: false, ability3: false, ability4: false };
 }
 
 /**
  * Turns the keyboard and gamepads into per-tick inputs for two players. Attach it to the stage
- * element (give it `tabIndex=0` and focus it) and call `read()` once per engine tick: jump, light,
- * heavy and special are true only on the tick after the button went down. A player whose source
- * is 'cpu' gets `cpuInputs` when `read` is given the match. Safe to import where there is no window.
+ * element (give it `tabIndex=0` and focus it) and call `read()` once per engine tick: jump and
+ * the abilities are true only on the tick after the button went down; attack is held, and a tap
+ * shorter than a tick still shows as one tick held. A player whose source is 'cpu' gets
+ * `cpuInputs` when `read` is given the match. Safe to import where there is no window.
  */
 export class InputReader {
   private readonly down = new Set<string>();
@@ -153,16 +167,26 @@ export class InputReader {
     }
     const held = source === 'gamepad' ? this.gamepadHeld(player) : this.keyboardHeld(player);
     const previous = this.previous[player];
-    const out = noInputs();
+    const edges = heldNone();
     for (const action of ACTIONS) {
-      out[action] = EDGE.includes(action) ? held[action] && !previous[action] : held[action];
+      edges[action] = EDGE.includes(action) ? held[action] && !previous[action] : held[action];
     }
     // A key pressed and released between two reads is an edge too: it was never seen held.
     if (source !== 'gamepad') {
       const map = KEYS[player];
-      for (const action of EDGE) if (!out[action] && map[action].some((code) => this.tapped.has(code))) out[action] = true;
+      for (const action of [...EDGE, 'attack'] as InputAction[]) {
+        if (!edges[action] && map[action].some((code) => this.tapped.has(code))) edges[action] = true;
+      }
     }
     this.previous[player] = held;
+    const out = noInputs();
+    out.left = edges.left;
+    out.right = edges.right;
+    out.jump = edges.jump;
+    out.attack = edges.attack;
+    ABILITIES.forEach((action, n) => {
+      out.abilities[n] = edges[action];
+    });
     return out;
   }
 

@@ -1,25 +1,37 @@
 import { describe, expect, it } from 'vitest';
+import { DOT_TICK_FRAMES, GCD_FRAMES } from '../../src/engine/abilities';
 import { BRAND } from '../../src/engine/brand';
 import { type Inputs, type Match, newMatch, poseOf, tick } from '../../src/engine/engine';
 import { BODY, FINISH_FRAMES, HALF, HP, INTRO_FRAMES, KO_SLOWMO, ROUND_END_FRAMES, START_X } from '../../src/engine/stage';
-import { fakeMatch, fakeTable, inputs, NONE, place, run, skipIntro, until } from './fake';
+import { fakeMatch, fakeTable, FULL_SET, HUNTER, inputs, MAGE, NONE, PALADIN, place, PRIEST, rig, ROGUE, run, SHAMAN, skipIntro, until, WARLOCK, WARRIOR } from './fake';
 
 /** A match in the fight phase with the fighters `gap` apart. */
-function fighting(gap = 1.5, seed = 1): Match {
-  const match = fakeMatch(seed);
+function fighting(gap = 1.5, seed = 1, classes: [number, number] = [WARRIOR, WARRIOR], shields: [boolean, boolean] = [false, false]): Match {
+  const match = fakeMatch(seed, classes, shields);
   skipIntro(match);
   expect(match.phase).toBe('fight');
   place(match, gap);
   return match;
 }
 
-/** Ticks through one whole attack: the press, then the move's 1000 ms. */
-function swing(match: Match, attacker: 0 | 1, press: Partial<Inputs>, held: [Inputs, Inputs] = NONE): void {
+/** One tap of the attack key by `attacker`, then the swing's 1000 ms. The roll is rigged to `outcome`. */
+function swing(match: Match, attacker: 0 | 1, outcome: Parameters<typeof rig>[1] = 'hit', held: [Inputs, Inputs] = NONE): void {
+  rig(match, outcome);
   const both: [Inputs, Inputs] = [{ ...held[0] }, { ...held[1] }];
-  both[attacker] = { ...both[attacker], ...press };
+  both[attacker] = { ...both[attacker], attack: true };
   tick(match, both);
-  run(match, 80, held);
+  run(match, 70, held);
 }
+
+/** Presses ability `n` for `who` on one tick. */
+function press(match: Match, who: 0 | 1, n: number, outcome?: Parameters<typeof rig>[1]): void {
+  if (outcome) rig(match, outcome);
+  const both: [Inputs, Inputs] = [inputs(), inputs()];
+  both[who] = inputs({ ability: n });
+  tick(match, both);
+}
+
+const texts = (match: Match, side: 0 | 1) => match.texts.filter((t) => t.side === side).map((t) => `${t.kind}:${t.text}`);
 
 describe('intro', () => {
   it('starts on the marks with ROUND 1 and reaches FIGHT!', () => {
@@ -38,9 +50,9 @@ describe('intro', () => {
 
   it('ignores inputs during the intro', () => {
     const match = fakeMatch();
-    run(match, 50, [inputs({ right: true, light: true }), inputs()]);
+    run(match, 50, [inputs({ right: true, attack: true, ability: 0 }), inputs()]);
     expect(match.fighters[0].x).toBe(-START_X);
-    expect(match.fighters[0].state).not.toBe('attack');
+    expect(match.fighters[0].state).toBe('intro');
   });
 });
 
@@ -91,99 +103,491 @@ describe('movement', () => {
   });
 });
 
-describe('attacks', () => {
-  it('a light hit deals 8 once, with hitstop and pushback', () => {
+describe('the auto-attack', () => {
+  it('a one-hander swings every 2.0 s while the key is held', () => {
     const match = fighting(1.5);
-    tick(match, [inputs({ light: true }), inputs()]);
-    expect(match.fighters[0].state).toBe('attack');
-    expect(match.fighters[0].move).toBe('light');
+    const held: [Inputs, Inputs] = [inputs({ attack: true }), inputs()];
+    const starts: number[] = [];
+    for (let f = 0; f < 400; f++) {
+      tick(match, held);
+      const p1 = match.fighters[0];
+      if (p1.state === 'attack' && p1.move === 'swing' && p1.t < 17) starts.push(f);
+    }
+    expect(starts).toEqual([0, 120, 240, 360]);
+    expect(match.tables[0].weapon.speed).toBe(120);
+    expect(match.fighters[1].hp).toBeLessThan(HP);
+  });
+
+  it('a two-hander swings every 3.4 s and hits harder', () => {
+    const table = fakeTable([...FULL_SET, 'Attack2H', 'Ready2H'], 'twoHand');
+    expect(table.weapon.speed).toBe(204);
+    expect(table.weapon.damage).toBe(13);
+    expect(table.moves.swing.animation).toBe('Attack2H');
+  });
+
+  it('a tap queues one swing and no more', () => {
+    const match = fighting(1.5);
+    swing(match, 0, 'hit');
+    expect(match.fighters[1].hp).toBe(HP - 7);
+    run(match, 300);
+    expect(match.fighters[1].hp).toBe(HP - 7);
+    expect(match.fighters[0].queued).toBe(false);
+  });
+
+  it('a queued swing waits for the target to come in reach', () => {
+    const match = fighting(3.5);
+    tick(match, [inputs({ attack: true }), inputs()]);
+    run(match, 30);
+    expect(match.fighters[0].state).not.toBe('attack');
+    expect(match.fighters[0].queued).toBe(true);
+    rig(match, 'hit');
+    run(match, 60, [inputs(), inputs({ left: true })]);
+    expect(match.fighters[0].move).toBe('swing');
+  });
+
+  it('cycles the swing animation variations', () => {
+    const match = fighting(1.5);
+    const seen = new Set<number>();
+    for (let f = 0; f < 400; f++) {
+      rig(match, 'hit');
+      tick(match, [inputs({ attack: true }), inputs()]);
+      if (match.fighters[0].move === 'swing') seen.add(poseOf(match, 0).sequence);
+    }
+    expect(seen.size).toBe(3);
+  });
+
+  it('a bow shoots instead: the shot flies and lands for 9', () => {
+    const table = fakeTable([...FULL_SET, 'AttackBow', 'ReadyBow'], 'bow', {}, HUNTER);
+    const match = newMatch([table, fakeTable()], 1);
+    skipIntro(match);
+    place(match, 5);
+    rig(match, 'hit');
+    tick(match, [inputs({ attack: true }), inputs()]);
+    const fired = until(match, (m) => m.projectiles.length > 0, 60);
+    expect(fired).toBeGreaterThan(0);
+    expect(match.projectiles[0]!.ability).toBe(-1);
+    expect(until(match, (m) => m.fighters[1].hp < HP, 120)).toBeGreaterThan(0);
+    expect(match.fighters[1].hp).toBe(HP - 9);
+  });
+});
+
+describe('the hit table', () => {
+  it('a plain hit deals the weapon damage, flinches and floats the number', () => {
+    const match = fighting(1.5);
+    rig(match, 'hit');
+    tick(match, [inputs({ attack: true }), inputs()]);
     const landed = until(match, (m) => m.fighters[1].hp < HP, 60);
     expect(landed).toBeGreaterThan(0);
-    expect(match.fighters[1].hp).toBe(92);
-    expect(match.fighters[1].hitstop).toBeGreaterThan(0);
-    expect(match.fighters[0].hitstop).toBeGreaterThan(0);
-    expect(match.fighters[1].vx).toBeGreaterThan(0);
+    expect(match.fighters[1].hp).toBe(93);
     expect(match.fighters[1].move).toBe('hit');
+    expect(match.fighters[1].hitstop).toBeGreaterThan(0);
+    expect(match.fighters[1].vx).toBeGreaterThan(0);
     expect(match.sparks[0]?.kind).toBe('hit');
-    run(match, 80);
-    expect(match.fighters[1].hp).toBe(92);
+    expect(texts(match, 1)).toEqual(['damage:7']);
     expect(match.fighters[1].tookDamage).toBe(true);
-    expect(match.fighters[0].state).toBe('idle');
   });
 
-  it('a blocked hit deals 0 and makes a block spark', () => {
+  it('a crit doubles the damage with its own animation and a big yellow number', () => {
     const match = fighting(1.5);
-    const held: [Inputs, Inputs] = [inputs(), inputs({ block: true })];
-    tick(match, held);
-    expect(match.fighters[1].blocking).toBe(true);
-    swing(match, 0, { light: true }, held);
+    swing(match, 0, 'crit');
+    expect(match.fighters[1].hp).toBe(HP - 14);
+    expect(match.sparks.length === 0 || match.sparks[0]?.kind === 'crit').toBe(true);
+    expect(texts(match, 1)).toEqual(['crit:14']);
+  });
+
+  it('a miss does nothing but say so', () => {
+    const match = fighting(1.5);
+    swing(match, 0, 'miss');
     expect(match.fighters[1].hp).toBe(HP);
+    expect(texts(match, 1)).toEqual(['miss:MISS']);
     expect(match.fighters[1].tookDamage).toBe(false);
-    expect(match.sparks.some((s) => s.kind === 'block') || match.sparks.length === 0).toBe(true);
   });
 
-  it('records the block spark when it lands', () => {
+  it('a dodge plays Dodge', () => {
     const match = fighting(1.5);
-    const held: [Inputs, Inputs] = [inputs(), inputs({ block: true })];
-    tick(match, held);
-    tick(match, [inputs({ light: true }), inputs({ block: true })]);
-    const at = until(match, (m) => m.sparks.length > 0, 60, held);
-    expect(at).toBeGreaterThan(0);
-    expect(match.sparks[0]?.kind).toBe('block');
+    rig(match, 'dodge');
+    tick(match, [inputs({ attack: true }), inputs()]);
+    until(match, (m) => m.texts.length > 0, 60);
+    expect(match.fighters[1].move).toBe('dodge');
     expect(match.fighters[1].hp).toBe(HP);
+    expect(texts(match, 1)).toEqual(['dodge:DODGE']);
   });
 
-  it('misses out of range', () => {
-    const match = fighting(3);
-    swing(match, 0, { light: true });
-    expect(match.fighters[1].hp).toBe(HP);
-    expect(match.sparks.length).toBe(0);
-  });
-
-  it('misses a jumping target', () => {
+  it('a parry plays the weapon parry and opens a riposte', () => {
     const match = fighting(1.5);
-    tick(match, [inputs({ light: true }), inputs({ jump: true })]);
+    rig(match, 'parry');
+    tick(match, [inputs({ attack: true }), inputs()]);
+    until(match, (m) => m.texts.length > 0, 60);
+    expect(match.fighters[1].move).toBe('parry');
+    expect(match.tables[1].moves.parry.animation).toBe('Parry1H');
+    expect(match.fighters[1].riposteT).toBeGreaterThan(0);
+    expect(match.sparks[0]?.kind).toBe('parry');
+    // The riposte: the parrier's next melee ability is a sure crit.
+    match.fighters[1].resource = 30;
+    run(match, 30);
+    place(match, 1.5);
+    press(match, 1, 1, 'miss');
+    until(match, (m) => m.fighters[0].hp < HP, 60);
+    expect(match.fighters[0].hp).toBe(HP - 36);
+    expect(texts(match, 0)).toContain('crit:36');
+  });
+
+  it('only a shield blocks, from the front, for 60 % damage', () => {
+    const match = fighting(1.5, 1, [WARRIOR, WARRIOR], [false, true]);
+    expect(match.tables[1].moves.parry.animation).toBe('ShieldBlock');
+    swing(match, 0, 'block');
+    expect(match.fighters[1].hp).toBe(HP - 4);
+    expect(texts(match, 1)).toEqual(['block:BLOCKED 4']);
+    const bare = fighting(1.5);
+    swing(bare, 0, 'block');
+    // Without a shield the same roll falls in the crit band.
+    expect(bare.fighters[1].hp).toBe(HP - 14);
+  });
+
+  it('a stunned target can neither dodge nor parry', () => {
+    const match = fighting(1.5, 1, [ROGUE, WARRIOR]);
+    press(match, 0, 1, 'hit'); // Kidney Shot
+    until(match, (m) => m.fighters[1].state === 'stun', 60);
+    swing(match, 0, 'dodge');
+    expect(match.fighters[1].hp).toBeLessThan(HP - 6);
+  });
+
+  it('is the same for the same seed', () => {
+    const roll = (seed: number) => {
+      const match = fighting(1.5, seed);
+      const out: string[] = [];
+      for (let f = 0; f < 1200; f++) {
+        tick(match, [inputs({ attack: true }), inputs({ attack: true })]);
+        for (const t of match.texts) if (t.t === 1) out.push(`${t.side}:${t.text}`);
+      }
+      return out;
+    };
+    expect(roll(5)).toEqual(roll(5));
+    expect(roll(5)).not.toEqual(roll(6));
+    expect(new Set(roll(5)).size).toBeGreaterThan(2);
+  });
+});
+
+describe('resources', () => {
+  it('rage starts empty, builds on a landed swing and on taking a blow', () => {
+    const match = fighting(1.5);
+    expect(match.fighters[0].resource).toBe(0);
+    swing(match, 0, 'hit');
+    expect(match.fighters[0].resource).toBe(10);
+    expect(match.fighters[1].resource).toBe(5);
+    swing(match, 0, 'miss');
+    expect(match.fighters[0].resource).toBe(10);
+  });
+
+  it('an ability is refused without the rage for it, and spends it when it goes', () => {
+    const match = fighting(1.5);
+    press(match, 0, 1);
+    expect(match.fighters[0].state).not.toBe('ability');
+    expect(texts(match, 0)).toEqual(['info:NOT ENOUGH RAGE']);
+    match.fighters[0].resource = 45;
+    press(match, 0, 1, 'hit');
+    expect(match.fighters[0].state).toBe('ability');
+    expect(match.fighters[0].move).toBe('ability1');
+    expect(match.fighters[0].resource).toBe(15);
+    until(match, (m) => m.fighters[1].hp < HP, 60);
+    expect(match.fighters[1].hp).toBe(HP - 18);
+  });
+
+  it('energy regenerates at 10 a second up to 100', () => {
+    const match = fighting(1.5, 1, [ROGUE, WARRIOR]);
+    expect(match.fighters[0].resource).toBe(100);
+    match.fighters[0].resource = 50;
     run(match, 60);
-    expect(match.fighters[1].hp).toBe(HP);
+    expect(match.fighters[0].resource).toBeCloseTo(60, 5);
+    run(match, 600);
+    expect(match.fighters[0].resource).toBe(100);
+  });
+});
+
+describe('cooldowns', () => {
+  it('the global cooldown holds the next ability for 1.5 s', () => {
+    const match = fighting(1.5, 1, [ROGUE, WARRIOR]);
+    press(match, 0, 0, 'hit');
+    expect(match.fighters[0].gcd).toBe(GCD_FRAMES);
+    run(match, 40);
+    const energy = match.fighters[0].resource;
+    press(match, 0, 0, 'hit');
+    expect(match.fighters[0].resource).toBeGreaterThan(energy); // not spent again
+    run(match, GCD_FRAMES);
+    expect(match.fighters[0].gcd).toBe(0);
+    press(match, 0, 0, 'hit');
+    expect(match.fighters[0].t).toBeLessThan(20);
+    expect(match.fighters[0].resource).toBeLessThan(energy);
   });
 
-  it('a heavy deals 16 and the third one knocks down', () => {
+  it('an ability on cooldown says NOT READY until it is back', () => {
     const match = fighting(1.5);
-    swing(match, 0, { heavy: true });
-    expect(match.fighters[1].hp).toBe(84);
-    expect(match.fighters[1].move).not.toBe('knockdown');
-    place(match, 1.5);
-    swing(match, 0, { heavy: true });
-    place(match, 1.5);
-    tick(match, [inputs({ heavy: true }), inputs()]);
-    const at = until(match, (m) => m.fighters[1].hp < 68, 60);
-    expect(at).toBeGreaterThan(0);
-    expect(match.fighters[1].move).toBe('knockdown');
-    expect(match.fighters[1].hp).toBe(52);
+    match.fighters[0].resource = 100;
+    press(match, 0, 1, 'hit');
+    expect(match.fighters[0].cooldowns[1]).toBe(360);
+    run(match, 200);
+    press(match, 0, 1);
+    expect(texts(match, 0)).toContain('info:NOT READY');
+    run(match, 160);
+    expect(match.fighters[0].cooldowns[1]).toBe(0);
+    match.texts.length = 0;
+    press(match, 0, 1, 'hit');
+    expect(match.fighters[0].move).toBe('ability1');
   });
 
-  it('spawns the special projectile at 55 % and hits for 12', () => {
-    const match = fighting(4);
-    tick(match, [inputs({ special: true }), inputs()]);
-    expect(match.fighters[0].move).toBe('special');
-    expect(match.fighters[0].cooldown).toBe(90);
-    const spawned = until(match, (m) => m.projectiles.length > 0, 60);
-    expect(spawned).toBeGreaterThanOrEqual(32);
-    expect(spawned).toBeLessThanOrEqual(34);
-    const p = match.projectiles[0]!;
-    // Spawned 0.8 ahead of P1 at x = -2, then flown one frame.
-    expect(p.x).toBeCloseTo(-2 + 0.8 + 0.14, 5);
-    expect(p.z).toBe(1.25);
-    expect(p.vx).toBeCloseTo(0.14, 5);
-    const hit = until(match, (m) => m.fighters[1].hp < HP, 200);
-    expect(hit).toBeGreaterThan(0);
-    expect(match.fighters[1].hp).toBe(88);
+  it('an ability pressed during hitstop is kept and goes when the fighter is free', () => {
+    const match = fighting(1.5, 1, [ROGUE, WARRIOR]);
+    match.fighters[0].hitstop = 6;
+    press(match, 0, 0, 'hit');
+    expect(match.fighters[0].state).toBe('idle');
+    expect(match.fighters[0].buffered).toBe(0);
+    run(match, 6);
+    expect(match.fighters[0].move).toBe('ability0');
+    expect(match.fighters[0].buffered).toBe(-1);
+  });
+
+  it('Evasion skips the global cooldown', () => {
+    const match = fighting(1.5, 1, [ROGUE, WARRIOR]);
+    press(match, 0, 2);
+    expect(match.fighters[0].gcd).toBe(0);
+    expect(match.fighters[0].evasionT).toBe(480);
+    press(match, 0, 0, 'hit');
+    expect(match.fighters[0].move).toBe('ability0');
+  });
+});
+
+describe('abilities', () => {
+  it('Execute only works under 20 % health', () => {
+    const match = fighting(1.5);
+    match.fighters[0].resource = 100;
+    press(match, 0, 3);
+    expect(match.fighters[0].state).not.toBe('ability');
+    expect(texts(match, 0)).toEqual(['info:NEEDS 20% HEALTH']);
+    match.fighters[1].hp = 19;
+    run(match, 1);
+    press(match, 0, 3, 'hit');
+    expect(match.fighters[0].move).toBe('ability3');
+    expect(match.tables[0].kit.abilities[3].move.animation).toBe('CombatExecute');
+    until(match, (m) => m.fighters[1].hp < 19, 60);
+    expect(match.fighters[1].hp).toBe(0);
+    expect(match.phase).toBe('finish');
+  });
+
+  it('Whirlwind hits behind as well', () => {
+    const match = fighting(1.5);
+    match.fighters[0].resource = 100;
+    match.fighters[0].facing = -1; // turned away for the test's one tick
+    place(match, 1.5);
+    match.fighters[0].facing = -1;
+    expect(match.tables[0].kit.abilities[2].both).toBe(true);
+    press(match, 0, 2, 'hit');
+    expect(match.fighters[0].move).toBe('ability2');
+    until(match, (m) => m.fighters[1].hp < HP, 60);
+    expect(match.fighters[1].hp).toBe(HP - 14);
+  });
+
+  it('Charge runs at a far target, lands a stun and earns rage', () => {
+    const match = fighting(5);
+    press(match, 0, 0);
+    expect(match.fighters[0].state).toBe('dash');
+    expect(match.fighters[0].move).toBe('cast0');
+    const arrived = until(match, (m) => m.fighters[0].state !== 'dash', 90);
+    expect(arrived).toBeGreaterThan(5);
+    expect(Math.abs(match.fighters[1].x - match.fighters[0].x)).toBeLessThan(2.2);
+    expect(match.fighters[0].move).toBe('ability0');
+    expect(match.fighters[1].state).toBe('stun');
+    expect(match.fighters[1].stunT).toBeGreaterThan(0);
+    expect(match.fighters[0].resource).toBe(20);
+    expect(texts(match, 1)).toContain('status:STUNNED');
+  });
+
+  it('Charge needs room: too close is refused', () => {
+    const match = fighting(1.5);
+    press(match, 0, 0);
+    expect(match.fighters[0].state).not.toBe('dash');
+    expect(texts(match, 0)).toEqual(['info:TOO CLOSE']);
+  });
+
+  it('a stun ends, and the stunned cannot act', () => {
+    const match = fighting(1.5, 1, [ROGUE, WARRIOR]);
+    press(match, 0, 1, 'hit'); // Kidney Shot
+    until(match, (m) => m.fighters[1].state === 'stun', 60);
+    expect(match.fighters[1].stunT).toBe(120);
+    expect(match.fighters[1].move).toBe('dazed');
+    run(match, 30); // the nudge settles
+    const x = match.fighters[1].x;
+    run(match, 40, [inputs(), inputs({ right: true, attack: true, ability: 1 })]);
+    expect(match.fighters[1].x).toBeCloseTo(x, 3);
+    expect(match.fighters[1].state).toBe('stun');
+    run(match, 60);
+    expect(match.fighters[1].stunT).toBe(0);
+    expect(match.fighters[1].state).not.toBe('stun');
+    // Free again: the queued swing goes first, then the walk.
+    tick(match, [inputs(), inputs({ left: true })]);
+    expect(match.fighters[1].state).toBe('attack');
+    run(match, 70, [inputs(), inputs({ left: true })]);
+    expect(match.fighters[1].state).toBe('walk');
+  });
+
+  it('a dot ticks every 3 s until its ticks are spent', () => {
+    const match = fighting(4, 1, [PRIEST, WARRIOR]);
+    press(match, 0, 1, 'hit'); // Shadow Word: Pain
+    expect(match.fighters[1].dots.length).toBe(1);
+    expect(match.fighters[1].hp).toBe(HP);
+    run(match, DOT_TICK_FRAMES);
+    expect(match.fighters[1].hp).toBe(HP - 5);
+    expect(texts(match, 1)).toContain('dot:5');
+    run(match, DOT_TICK_FRAMES * 4);
+    expect(match.fighters[1].hp).toBe(HP - 25);
+    expect(match.fighters[1].dots.length).toBe(0);
+    run(match, DOT_TICK_FRAMES);
+    expect(match.fighters[1].hp).toBe(HP - 25);
+  });
+
+  it('a cast fills its bar, then the bolt flies and slows', () => {
+    const match = fighting(4, 1, [MAGE, WARRIOR]);
+    press(match, 0, 0); // Frostbolt, 1.5 s
+    expect(match.fighters[0].state).toBe('cast');
+    expect(match.fighters[0].cast).toMatchObject({ ability: 0, total: 90 });
+    expect(match.fighters[0].resource).toBe(100);
+    run(match, 89);
+    expect(match.fighters[0].state).toBe('cast');
+    rig(match, 'hit');
+    run(match, 1);
+    expect(match.fighters[0].state).toBe('ability');
+    expect(match.fighters[0].cast).toBeUndefined();
+    expect(match.fighters[0].resource).toBe(80);
+    expect(until(match, (m) => m.projectiles.length > 0, 60)).toBeGreaterThan(0);
+    expect(until(match, (m) => m.fighters[1].hp < HP, 120)).toBeGreaterThan(0);
+    expect(match.fighters[1].hp).toBe(HP - 16);
+    expect(match.fighters[1].slowT).toBeGreaterThan(0);
+    expect(texts(match, 1)).toContain('status:SLOWED');
+  });
+
+  it('damage interrupts a cast', () => {
+    const match = fighting(1.5, 1, [MAGE, WARRIOR]);
+    press(match, 0, 0);
+    expect(match.fighters[0].state).toBe('cast');
+    rig(match, 'hit');
+    tick(match, [inputs(), inputs({ attack: true })]);
+    until(match, (m) => m.fighters[0].hp < HP, 60);
+    expect(match.fighters[0].cast).toBeUndefined();
+    expect(match.fighters[0].state).not.toBe('cast');
+    run(match, 120);
     expect(match.projectiles.length).toBe(0);
+    expect(match.fighters[0].resource).toBe(100);
   });
 
-  it('a jumping target clears the projectile', () => {
-    const match = fighting(4);
-    tick(match, [inputs({ special: true }), inputs()]);
+  it('moving cancels a cast', () => {
+    const match = fighting(4, 1, [MAGE, WARRIOR]);
+    press(match, 0, 1);
+    run(match, 20);
+    tick(match, [inputs({ left: true }), inputs()]);
+    expect(match.fighters[0].cast).toBeUndefined();
+    expect(match.fighters[0].state).toBe('back');
+  });
+
+  it('Earth Shock interrupts and locks the caster out', () => {
+    const match = fighting(4, 1, [MAGE, SHAMAN]);
+    press(match, 0, 0);
+    expect(match.fighters[0].state).toBe('cast');
+    press(match, 1, 1, 'hit');
+    expect(match.fighters[0].cast).toBeUndefined();
+    expect(match.fighters[0].lockoutT).toBe(120);
+    expect(texts(match, 0)).toContain('status:INTERRUPTED');
+    run(match, GCD_FRAMES);
+    press(match, 0, 0);
+    expect(texts(match, 0)).toContain('info:LOCKED OUT');
+    expect(match.fighters[0].state).not.toBe('cast');
+  });
+
+  it('Holy Light heals the caster after its cast', () => {
+    const match = fighting(4, 1, [PALADIN, WARRIOR]);
+    match.fighters[0].hp = 50;
+    press(match, 0, 2);
+    run(match, 121);
+    expect(match.fighters[0].hp).toBe(85);
+    expect(texts(match, 0)).toContain('heal:+35');
+    expect(match.fighters[0].resource).toBeCloseTo(70, 0);
+  });
+
+  it('Power Word: Shield absorbs before health is touched', () => {
+    const match = fighting(1.5, 1, [PRIEST, WARRIOR]);
+    press(match, 0, 2);
+    expect(match.fighters[0].absorb).toBe(25);
+    swing(match, 1, 'hit');
+    expect(match.fighters[0].hp).toBe(HP);
+    expect(match.fighters[0].absorb).toBe(18);
+    expect(texts(match, 0)).toContain('absorb:ABSORBED 7');
+    expect(match.fighters[0].tookDamage).toBe(false);
+  });
+
+  it('Evasion turns a crit roll into a dodge', () => {
+    const match = fighting(1.5, 1, [ROGUE, WARRIOR]);
+    press(match, 0, 2);
+    swing(match, 1, 'crit');
+    expect(match.fighters[0].hp).toBe(HP);
+    expect(texts(match, 0)).toEqual(['status:EVASION', 'dodge:DODGE']);
+  });
+
+  it('Blink puts the mage 3.5 away from the target', () => {
+    const match = fighting(1.5, 1, [MAGE, WARRIOR]);
+    const x = match.fighters[0].x;
+    press(match, 0, 3);
+    expect(match.fighters[0].x).toBeCloseTo(x - 3.5, 5);
+    expect(match.fighters[0].resource).toBe(85);
+  });
+
+  it('Disengage leaps away', () => {
+    const match = fighting(1.5, 1, [HUNTER, WARRIOR]);
+    const x = match.fighters[0].x;
+    press(match, 0, 2);
+    expect(match.fighters[0].airborne).toBe(true);
+    expect(match.fighters[0].gcd).toBe(0);
+    until(match, (m) => !m.fighters[0].airborne, 120);
+    expect(match.fighters[0].x).toBeLessThan(x - 2);
+  });
+
+  it('Fear sends the target running until a blow breaks it', () => {
+    const match = fighting(3, 1, [WARLOCK, WARRIOR]);
+    press(match, 0, 2);
+    rig(match, 'hit');
+    run(match, 61);
+    expect(match.fighters[1].state).toBe('fear');
+    expect(match.fighters[1].facing).toBe(1);
+    const x = match.fighters[1].x;
+    run(match, 30, [inputs(), inputs({ attack: true, left: true })]);
+    expect(match.fighters[1].x).toBeGreaterThan(x + 0.5);
+    expect(match.fighters[1].state).toBe('fear');
+    press(match, 0, 1, 'hit'); // Corruption: no damage up front, the fear holds
+    expect(match.fighters[1].state).toBe('fear');
+    run(match, 20);
+    expect(match.fighters[1].state).toBe('fear');
+    // A blow breaks it.
+    run(match, 12); // the warlock's Corruption animation lets go
+    place(match, 1.5);
+    rig(match, 'hit');
+    tick(match, [inputs({ attack: true }), inputs()]);
+    expect(until(match, (m) => m.fighters[1].hp < HP, 30)).toBeGreaterThan(0);
+    expect(match.fighters[1].state).not.toBe('fear');
+    expect(match.fighters[1].fearT).toBe(0);
+  });
+
+  it('a fear runs out on its own', () => {
+    const match = fighting(3, 1, [WARLOCK, WARRIOR]);
+    press(match, 0, 2);
+    rig(match, 'hit');
+    run(match, 61);
+    expect(match.fighters[1].state).toBe('fear');
+    run(match, 150);
+    expect(match.fighters[1].state).not.toBe('fear');
+  });
+
+  it('a jumping target clears a bolt', () => {
+    const match = fighting(4, 1, [MAGE, WARRIOR]);
+    press(match, 0, 0);
+    rig(match, 'hit');
+    run(match, 90);
     until(match, (m) => m.projectiles.length > 0, 60);
     const p = match.projectiles[0]!;
     const framesToArrive = Math.round((match.fighters[1].x - p.x) / p.vx);
@@ -192,21 +596,14 @@ describe('attacks', () => {
     run(match, 40);
     expect(match.fighters[1].hp).toBe(HP);
   });
-
-  it('the special honours its cooldown', () => {
-    const match = fighting(4);
-    tick(match, [inputs({ special: true }), inputs()]);
-    run(match, 70);
-    tick(match, [inputs({ special: true }), inputs()]);
-    expect(match.fighters[0].move).not.toBe('special');
-  });
 });
 
-/** Drives P1 to a KO: P2 is left at `hp` and P1 lands a light. */
+/** Drives P1 to a KO: P2 is left at `hp` and P1 lands a swing. */
 function toFinish(gap = 1.5): Match {
   const match = fighting(gap);
-  match.fighters[1].hp = 8;
-  tick(match, [inputs({ light: true }), inputs()]);
+  match.fighters[1].hp = 7;
+  rig(match, 'hit');
+  tick(match, [inputs({ attack: true }), inputs()]);
   const at = until(match, (m) => m.phase === 'finish', 60);
   expect(at).toBeGreaterThan(0);
   return match;
@@ -221,11 +618,12 @@ describe('the finish', () => {
     expect(match.roundWinner).toBe(0);
   });
 
-  it('a landed heavy is DISHONOR! and the winner plays the finisher in slow motion', () => {
+  it('a landed ability is DISHONOR! and the winner plays the finisher in slow motion', () => {
     const match = toFinish();
     run(match, 60);
     place(match, 1.5);
-    tick(match, [inputs({ heavy: true }), inputs()]);
+    match.fighters[0].resource = 100;
+    press(match, 0, 1);
     const at = until(match, (m) => m.phase === 'ko', 90);
     expect(at).toBeGreaterThan(0);
     expect(match.banner?.text).toBe(BRAND.fatality);
@@ -236,11 +634,22 @@ describe('the finish', () => {
     expect(match.fighters[0].wins).toBe(1);
   });
 
-  it('a light just drops them: K.O.', () => {
+  it('Execute is allowed on the dazed loser', () => {
     const match = toFinish();
     run(match, 60);
     place(match, 1.5);
-    tick(match, [inputs({ light: true }), inputs()]);
+    match.fighters[0].resource = 100;
+    press(match, 0, 3);
+    expect(match.fighters[0].move).toBe('ability3');
+    expect(until(match, (m) => m.phase === 'ko', 90)).toBeGreaterThan(0);
+    expect(match.banner?.text).toBe(BRAND.fatality);
+  });
+
+  it('a plain swing just drops them: K.O.', () => {
+    const match = toFinish();
+    run(match, 60);
+    place(match, 1.5);
+    tick(match, [inputs({ attack: true }), inputs()]);
     const at = until(match, (m) => m.phase === 'ko', 90);
     expect(at).toBeGreaterThan(0);
     expect(match.banner?.text).toBe(BRAND.ko);
@@ -261,7 +670,7 @@ describe('the finish', () => {
     const match = toFinish();
     run(match, 60); // the pushback settles
     const x = match.fighters[1].x;
-    run(match, 10, [inputs(), inputs({ left: true, light: true })]);
+    run(match, 10, [inputs(), inputs({ left: true, attack: true, ability: 0 })]);
     expect(match.fighters[1].x).toBe(x);
     expect(match.fighters[1].state).toBe('dazed');
   });
@@ -279,9 +688,10 @@ describe('the finish', () => {
 
 describe('rounds', () => {
   function winRound(match: Match): void {
-    match.fighters[1].hp = 8;
+    match.fighters[1].hp = 7;
     place(match, 1.5);
-    tick(match, [inputs({ light: true }), inputs()]);
+    rig(match, 'hit');
+    tick(match, [inputs({ attack: true }), inputs()]);
     expect(until(match, (m) => m.phase === 'finish', 60)).toBeGreaterThan(0);
     run(match, FINISH_FRAMES + 1);
     expect(match.phase).toBe('ko');
@@ -301,10 +711,12 @@ describe('rounds', () => {
     expect(match.fighters[0].wins).toBe(1);
     expect(match.fighters[1].wins).toBe(0);
     expect(match.fighters[1].hp).toBe(HP);
+    expect(match.fighters[0].resource).toBe(0);
     expect(match.fighters[0].x).toBe(-START_X);
     expect(match.fighters[1].x).toBe(START_X);
     expect(match.fighters[1].state).toBe('intro');
     expect(match.banner?.text).toBe(BRAND.round(2));
+    expect(match.texts.length).toBe(0);
   });
 
   it('two KOs end the match', () => {
@@ -324,8 +736,8 @@ describe('rounds', () => {
 
   it('the timer gives the round to the higher hp', () => {
     const match = fighting(1.5);
-    swing(match, 0, { light: true });
-    expect(match.fighters[1].hp).toBe(92);
+    swing(match, 0, 'hit');
+    expect(match.fighters[1].hp).toBe(93);
     match.timer = 1;
     tick(match, NONE);
     expect(match.phase).toBe('ko');
@@ -343,8 +755,8 @@ describe('rounds', () => {
 
   it('a round where the winner was hit does not', () => {
     const match = fighting(1.5);
-    swing(match, 1, { light: true });
-    expect(match.fighters[0].hp).toBe(92);
+    swing(match, 1, 'hit');
+    expect(match.fighters[0].hp).toBe(93);
     run(match, 60); // P1 recovers from the hit
     winRound(match);
     run(match, KO_SLOWMO.frames);
@@ -366,31 +778,28 @@ describe('determinism', () => {
     const a = inputs({
       right: frame % 7 < 4,
       left: frame % 11 === 0,
-      light: frame % 23 === 0,
-      heavy: frame % 61 === 0,
-      special: frame % 97 === 0,
+      attack: frame % 23 < 12,
       jump: frame % 53 === 0,
-      block: frame % 13 < 2,
+      abilities: [frame % 61 === 0, frame % 97 === 0, frame % 131 === 0, frame % 37 === 0],
     });
     const b = inputs({
       left: frame % 5 < 3,
-      light: frame % 19 === 0,
-      heavy: frame % 47 === 0,
-      special: frame % 89 === 0,
+      attack: frame % 19 < 15,
       jump: frame % 71 === 0,
-      block: frame % 17 < 3,
+      abilities: [frame % 47 === 0, frame % 89 === 0, frame % 113 === 0, frame % 41 === 0],
     });
     return [a, b];
   }
 
   it('the same seed and inputs give the same match after 2000 ticks', () => {
-    const a = fakeMatch(42);
-    const b = fakeMatch(42);
+    const a = fakeMatch(42, [MAGE, WARRIOR]);
+    const b = fakeMatch(42, [MAGE, WARRIOR]);
     for (let f = 0; f < 2000; f++) {
       tick(a, scripted(f));
       tick(b, scripted(f));
     }
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
-    expect(a.fighters[0].hp + a.fighters[1].hp).toBeLessThan(2 * HP);
+    // Blood was drawn: a round was won, or someone is hurt.
+    expect(a.round > 1 || a.fighters[0].hp + a.fighters[1].hp < 2 * HP).toBe(true);
   });
 });

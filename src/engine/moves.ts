@@ -1,5 +1,15 @@
 import type { WeaponKind } from '@mogshot/character/equipment';
 import type { AnimationInfo } from '@mogshot/character/scene';
+import { ABILITY_ANIMATIONS, type Kit, resolveKit } from './abilities';
+import { finderOf, type HitWindow, type Move, moveFrom, type Variation } from './anim';
+
+export type { Finder, HitWindow, Move, Variation } from './anim';
+
+/*
+ * What a fighter can play: the core moves every fighter has (stances, steps, the auto-attack
+ * swing, dodges and parries, wounds, the death) and the class kit's abilities, each resolved
+ * to the first animation the model has.
+ */
 
 export type MoveName =
   | 'idle'
@@ -8,10 +18,12 @@ export type MoveName =
   | 'jumpStart'
   | 'jump'
   | 'jumpEnd'
-  | 'light'
-  | 'heavy'
-  | 'special'
-  | 'block'
+  /** The auto-attack: Attack* with all its variations. */
+  | 'swing'
+  | 'dodge'
+  | 'parry'
+  /** Casting: held while the cast bar fills. */
+  | 'cast'
   | 'hit'
   | 'crit'
   | 'knockdown'
@@ -21,53 +33,31 @@ export type MoveName =
   | 'intro'
   | 'win';
 
+/** A move a fighter can be in: a core move, or one of the kit's four abilities. */
+export type MoveRef = MoveName | `ability${0 | 1 | 2 | 3}` | `cast${0 | 1 | 2 | 3}`;
+
 export type Wielding = WeaponKind | 'unarmed';
 
-/** What an attack does, as fractions of the move's duration and stage units. */
-export interface HitWindow {
-  /** The attack connects while t/duration is in [from, to]. A projectile spawns when t passes `from`. */
-  from: number;
-  to: number;
-  /** Reach ahead of the attacker. */
-  range: number;
+/** The weapon the fighter swings with: how often, how hard, and whether it shoots. */
+export interface Weapon {
+  wielding: Wielding;
+  /** Frames between auto-attacks: 2.0 s one-hand and unarmed, 3.4 s two-hand, 3.0 s ranged. */
+  speed: number;
   damage: number;
-  /** Speed given to the target, away from the attacker. */
-  pushback: number;
-  /** Frames both fighters freeze when it lands. */
-  hitstop: number;
-  /** The target plays `crit`; every third landed one knocks them down. */
-  crit: boolean;
-  /** Spawns a projectile instead of testing reach. */
-  projectile: boolean;
-  /** Frames before the attacker may throw it again. */
-  cooldown: number;
-  /** Past this fraction the attacker may start another action. */
-  recover: number;
-}
-
-export interface Variation {
-  sequence: number;
-  /** Milliseconds. */
-  duration: number;
-}
-
-export interface Move {
-  name: MoveName;
-  /** The model animation that was found; '' when none of the candidates exists and the move borrows another. */
-  animation: string;
-  /** At least one. Only `light` collects every variation of its animation. */
-  variations: Variation[];
-  /** Wraps around when it ends; otherwise it holds its last frame until the engine moves on. */
-  loop: boolean;
-  hit?: HitWindow;
+  /** Bows, guns, crossbows and thrown weapons: the auto-attack is a shot. */
+  ranged: boolean;
+  /** Reach of a swing, or of a shot. */
+  range: number;
+  /** An off-hand shield: blocks. */
+  shield: boolean;
 }
 
 export interface MoveTable {
   moves: Record<MoveName, Move>;
+  kit: Kit;
+  weapon: Weapon;
   /** False when the model has neither JumpStart nor Jump; the jump still happens, in the idle animation. */
   hasJump: boolean;
-  /** False when nothing matched SpellCastDirected or ReadySpellDirected; the special still fires. */
-  hasSpecial: boolean;
 }
 
 const READY: Record<Wielding, string[]> = {
@@ -92,17 +82,6 @@ const ATTACK: Record<Wielding, string[]> = {
   thrown: ['AttackThrown', 'Attack1H'],
 };
 
-const SPECIAL: Record<Wielding, string[]> = {
-  unarmed: ['SpecialUnarmed'],
-  oneHand: ['Special1H'],
-  twoHand: ['Special2H'],
-  long: ['Special2H'],
-  bow: ['Special1H'],
-  rifle: ['Special1H'],
-  crossbow: ['Special1H'],
-  thrown: ['Special1H'],
-};
-
 const PARRY: Record<Wielding, string[]> = {
   unarmed: ['ParryUnarmed'],
   oneHand: ['Parry1H'],
@@ -114,17 +93,22 @@ const PARRY: Record<Wielding, string[]> = {
   thrown: ['Parry1H'],
 };
 
+/** Seconds between swings, by weapon. */
+const SPEED: Record<Wielding, number> = { unarmed: 2.0, oneHand: 2.0, twoHand: 3.4, long: 3.4, bow: 3.0, rifle: 3.0, crossbow: 3.0, thrown: 2.0 };
+const DAMAGE: Record<Wielding, number> = { unarmed: 5, oneHand: 7, twoHand: 13, long: 13, bow: 9, rifle: 9, crossbow: 9, thrown: 6 };
+const RANGED: ReadonlySet<Wielding> = new Set(['bow', 'rifle', 'crossbow', 'thrown']);
+
+export const MELEE_RANGE = 2.0;
+export const SHOT_RANGE = 8.0;
+
 const ALL_READY = ['Ready1H', 'Ready2H', 'ReadyUnarmed', 'Ready2HL', 'ReadyBow', 'ReadyRifle', 'ReadyCrossbow', 'ReadyThrown'];
 const ALL_ATTACK = ['Attack1H', 'Attack2H', 'Attack2HL', 'AttackUnarmed', 'AttackBow', 'AttackRifle', 'AttackCrossbow', 'AttackThrown'];
-const ALL_SPECIAL = ['Special1H', 'Special2H', 'SpecialUnarmed', 'CombatAbility2HBig01', 'RoundHouseKick', 'Kick'];
 const ALL_PARRY = ['ShieldBlock', 'Parry1H', 'Parry2H', 'Parry2HL', 'ParryUnarmed', 'Dodge'];
 
-const LIGHT_HIT: HitWindow = { from: 0.3, to: 0.55, range: 2.0, damage: 8, pushback: 0.35, hitstop: 6, crit: false, projectile: false, cooldown: 0, recover: 0.85 };
-const HEAVY_HIT: HitWindow = { from: 0.4, to: 0.65, range: 2.3, damage: 16, pushback: 0.6, hitstop: 10, crit: true, projectile: false, cooldown: 0, recover: 0.9 };
-const SPECIAL_HIT: HitWindow = { from: 0.55, to: 0.55, range: 0, damage: 12, pushback: 0.45, hitstop: 8, crit: false, projectile: true, cooldown: 90, recover: 0.85 };
+const SWING_HIT: HitWindow = { from: 0.25, to: 0.5, recover: 0.45 };
 
-/** Candidates in order of preference, for a given weapon. `light` collects all variations of the name it finds. */
-function candidates(wielding: Wielding): Record<MoveName, { names: string[]; loop: boolean; hit?: HitWindow }> {
+/** Candidates in order of preference, for a given weapon. `swing` collects all variations of the name it finds. */
+function candidates(wielding: Wielding, shield: boolean): Record<MoveName, { names: string[]; loop: boolean; hit?: HitWindow }> {
   const uniq = (first: string[], rest: string[]) => [...new Set([...first, ...rest])];
   return {
     idle: { names: uniq(READY[wielding], ['Stand']), loop: true },
@@ -133,10 +117,10 @@ function candidates(wielding: Wielding): Record<MoveName, { names: string[]; loo
     jumpStart: { names: ['JumpStart'], loop: false },
     jump: { names: ['Jump'], loop: true },
     jumpEnd: { names: ['JumpEnd', 'JumpLandRun'], loop: false },
-    light: { names: uniq(ATTACK[wielding], ['AttackUnarmed']), loop: false, hit: LIGHT_HIT },
-    heavy: { names: uniq(SPECIAL[wielding], ['Special1H', 'Special2H', 'SpecialUnarmed', 'CombatAbility2HBig01', 'RoundHouseKick', 'Kick']), loop: false, hit: HEAVY_HIT },
-    special: { names: ['SpellCastDirected', 'ReadySpellDirected'], loop: false, hit: SPECIAL_HIT },
-    block: { names: uniq(['ShieldBlock'], [...PARRY[wielding], 'Parry1H', 'Parry2H', 'ParryUnarmed', 'Dodge']), loop: false },
+    swing: { names: uniq(ATTACK[wielding], ['AttackUnarmed']), loop: false, hit: SWING_HIT },
+    dodge: { names: ['Dodge', 'Walkbackwards'], loop: false },
+    parry: { names: uniq(shield ? ['ShieldBlock'] : [], [...PARRY[wielding], 'Parry1H', 'Parry2H', 'ParryUnarmed', 'ShieldBlock', 'Dodge']), loop: false },
+    cast: { names: ['ReadySpellDirected', 'ChannelCastDirected', 'ReadySpellOmni', 'SpellCastDirected'], loop: true },
     hit: { names: ['CombatWound', 'StandWound'], loop: false },
     crit: { names: ['CombatCritical', 'CombatWound'], loop: false },
     knockdown: { names: ['Knockdown', 'CombatCritical'], loop: false },
@@ -149,74 +133,59 @@ function candidates(wielding: Wielding): Record<MoveName, { names: string[]; loo
 }
 
 export const MOVE_NAMES: readonly MoveName[] = [
-  'idle', 'walk', 'back', 'jumpStart', 'jump', 'jumpEnd', 'light', 'heavy', 'special', 'block',
+  'idle', 'walk', 'back', 'jumpStart', 'jump', 'jumpEnd', 'swing', 'dodge', 'parry', 'cast',
   'hit', 'crit', 'knockdown', 'dazed', 'death', 'finisher', 'intro', 'win',
 ];
 
-/** Every model animation any move may use, deduped: what select passes to `client.fighter()` so the worker pre-reads them. */
+/** Every model animation any move or ability may use, deduped: what select passes to `client.fighter()` so the worker pre-reads them. */
 export const ALL_MOVE_NAMES: readonly string[] = [
   ...new Set([
     ...ALL_READY, 'Stand',
     'Walk', 'Run', 'Walkbackwards', 'RunBackwards',
     'JumpStart', 'Jump', 'JumpEnd', 'JumpLandRun',
     ...ALL_ATTACK,
-    ...ALL_SPECIAL,
-    'SpellCastDirected', 'ReadySpellDirected',
+    'SpellCastDirected', 'ReadySpellDirected', 'ChannelCastDirected', 'ReadySpellOmni',
     ...ALL_PARRY,
     'CombatWound', 'StandWound', 'CombatCritical', 'Knockdown', 'Stun', 'Death',
-    'CombatExecute', 'CombatFinishingMove',
+    'CombatExecute', 'CombatFinishingMove', 'Special2H', 'Special1H',
     'BattleRoar', 'EmoteRoar', 'EmoteCheer',
+    ...ABILITY_ANIMATIONS,
   ]),
 ];
 
 /**
  * Picks a move table out of what a model animates: the first candidate the model has wins.
- * A move with no candidate borrows the idle animation (a jump still jumps, a block still blocks).
+ * A move with no candidate borrows the idle animation (a jump still jumps, a dodge still dodges).
+ * The kit is the class's, or a warrior's (a hunter's behind a bow) when the class is unknown.
  */
-export function resolveMoves(animations: readonly AnimationInfo[], wielding: Wielding): MoveTable {
-  const byName = new Map<string, AnimationInfo[]>();
-  for (const a of animations) {
-    const list = byName.get(a.name);
-    if (list) list.push(a);
-    else byName.set(a.name, [a]);
-  }
-  const find = (names: string[]): AnimationInfo[] | undefined => {
-    for (const name of names) {
-      const list = byName.get(name);
-      if (list && list.length > 0) return [...list].sort((a, b) => a.variation - b.variation);
-    }
-    return undefined;
-  };
-
-  const spec = candidates(wielding);
+export function resolveMoves(animations: readonly AnimationInfo[], wielding: Wielding, classId?: number, shield = false): MoveTable {
+  const find = finderOf(animations);
+  const spec = candidates(wielding, shield);
   const idleInfos = find(spec.idle.names) ?? (animations[0] ? [animations[0]] : undefined);
   const idleVariation: Variation = idleInfos?.[0]
     ? { sequence: idleInfos[0].sequence, duration: Math.max(1, idleInfos[0].duration) }
     : { sequence: 0, duration: 1000 };
-  const idleName = idleInfos?.[0]?.name ?? '';
+  const idle: Move = { name: 'idle', animation: idleInfos?.[0]?.name ?? '', variations: [idleVariation], loop: true };
 
   const moves = {} as Record<MoveName, Move>;
   let hasJump = false;
-  let hasSpecial = false;
   for (const name of MOVE_NAMES) {
     const c = spec[name];
-    const found = find(c.names);
-    if (found && (name === 'jumpStart' || name === 'jump')) hasJump = true;
-    if (found && name === 'special') hasSpecial = true;
-    let variations: Variation[];
-    if (!found) variations = [idleVariation];
-    else if (name === 'light') variations = found.map((a) => ({ sequence: a.sequence, duration: Math.max(1, a.duration) }));
-    else variations = [{ sequence: found[0]!.sequence, duration: Math.max(1, found[0]!.duration) }];
-    const move: Move = {
-      name,
-      animation: found ? found[0]!.name : name === 'idle' ? idleName : '',
-      variations,
-      loop: c.loop,
-    };
+    const move = name === 'idle' ? idle : moveFrom(find, name, c.names, c.loop, idle, name === 'swing');
+    if (move.animation && (name === 'jumpStart' || name === 'jump')) hasJump = true;
     if (c.hit) move.hit = c.hit;
     moves[name] = move;
   }
-  return { moves, hasJump, hasSpecial };
+  const ranged = RANGED.has(wielding);
+  const weapon: Weapon = {
+    wielding,
+    speed: Math.round(SPEED[wielding] * 60),
+    damage: DAMAGE[wielding],
+    ranged,
+    range: ranged ? SHOT_RANGE : MELEE_RANGE,
+    shield,
+  };
+  return { moves, kit: resolveKit(classId, wielding, find, idle), weapon, hasJump };
 }
 
 /** The variation a fighter plays: `variation` cycles through the move's list. */

@@ -6,10 +6,20 @@ import { INTRO_FRAMES } from '../../src/engine/stage';
 /** A retail-like animation list, every sequence 1000 ms unless overridden by name. */
 export const FULL_SET = [
   'Stand', 'Ready1H', 'Walk', 'Walkbackwards', 'JumpStart', 'Jump', 'JumpEnd',
-  'Attack1H', 'Attack1H', 'Attack1H', 'AttackUnarmed', 'Special1H', 'SpellCastDirected',
-  'ShieldBlock', 'CombatWound', 'CombatCritical', 'Knockdown', 'Stun', 'Death',
-  'CombatExecute', 'BattleRoar', 'EmoteCheer',
+  'Attack1H', 'Attack1H', 'Attack1H', 'AttackUnarmed', 'Special1H', 'SpellCastDirected', 'ReadySpellDirected',
+  'ShieldBlock', 'Parry1H', 'Dodge', 'CombatWound', 'CombatCritical', 'Knockdown', 'Stun', 'Death',
+  'CombatExecute', 'CombatAbility1H01', 'CombatAbility2HBig01', 'CombatWhirlwind', 'CombatChargeLoop', 'CombatChargeEnd',
+  'Kick', 'MagSpellCastBothFront', 'SpellCastOmni', 'BattleRoar', 'EmoteCheer',
 ];
+
+export const WARRIOR = 1;
+export const PALADIN = 2;
+export const HUNTER = 3;
+export const ROGUE = 4;
+export const PRIEST = 5;
+export const SHAMAN = 7;
+export const MAGE = 8;
+export const WARLOCK = 9;
 
 export function fakeAnimations(names: readonly string[] = FULL_SET, durations: Record<string, number> = {}): AnimationInfo[] {
   const seen = new Map<string, number>();
@@ -20,16 +30,22 @@ export function fakeAnimations(names: readonly string[] = FULL_SET, durations: R
   });
 }
 
-export function fakeTable(names: readonly string[] = FULL_SET, wielding: Wielding = 'oneHand', durations: Record<string, number> = {}): MoveTable {
-  return resolveMoves(fakeAnimations(names, durations), wielding);
+export function fakeTable(names: readonly string[] = FULL_SET, wielding: Wielding = 'oneHand', durations: Record<string, number> = {}, classId: number = WARRIOR, shield = false): MoveTable {
+  return resolveMoves(fakeAnimations(names, durations), wielding, classId, shield);
 }
 
-export function fakeMatch(seed = 1): Match {
-  return newMatch([fakeTable(), fakeTable()], seed);
+/** Two warriors with one-handers, unless other classes are asked for. */
+export function fakeMatch(seed = 1, classes: [number, number] = [WARRIOR, WARRIOR], shields: [boolean, boolean] = [false, false]): Match {
+  return newMatch([fakeTable(FULL_SET, 'oneHand', {}, classes[0], shields[0]), fakeTable(FULL_SET, 'oneHand', {}, classes[1], shields[1])], seed);
 }
 
-export function inputs(partial: Partial<Inputs> = {}): Inputs {
-  return { ...noInputs(), ...partial };
+export function inputs(partial: Partial<Omit<Inputs, 'abilities'>> & { abilities?: [boolean, boolean, boolean, boolean]; ability?: number } = {}): Inputs {
+  const out = { ...noInputs() };
+  const { ability, abilities, ...rest } = partial;
+  Object.assign(out, rest);
+  if (abilities) out.abilities = [...abilities];
+  if (ability !== undefined) out.abilities[ability] = true;
+  return out;
 }
 
 export const NONE: [Inputs, Inputs] = [inputs(), inputs()];
@@ -59,4 +75,19 @@ export function place(match: Match, gap: number): void {
   match.fighters[1].x = gap / 2;
   match.fighters[0].facing = 1;
   match.fighters[1].facing = -1;
+}
+
+/** Fixes the next roll on the hit table: the LCG state whose next draw lands in the wanted band. */
+export function rig(match: Match, wanted: 'hit' | 'crit' | 'miss' | 'dodge' | 'parry' | 'block'): void {
+  // Bands of the melee table: miss [0, .05), dodge [.05, .11), parry [.11, .17), block [.17, .27), crit [.27, .42), hit [.42, 1).
+  const target = { miss: 0.02, dodge: 0.08, parry: 0.14, block: 0.2, crit: 0.3, hit: 0.7 }[wanted];
+  // Search a seed whose next draw is close to the target.
+  for (let seed = 1; seed < 1_000_000; seed++) {
+    const next = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    if (Math.abs(next / 4294967296 - target) < 0.004) {
+      match.rng = seed;
+      return;
+    }
+  }
+  throw new Error('no seed found');
 }
