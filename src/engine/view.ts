@@ -59,6 +59,8 @@ export interface FighterView {
   wins: number;
   /** 'idle', 'attack', 'cast', 'stun' ... as the engine names them. */
   state: string;
+  /** The game's red error line: why the last press was refused (NOT ENOUGH RAGE, OUT OF RANGE, NOT READY ...), for about 0.75 s; then undefined. */
+  notice: string | undefined;
 }
 
 const ACTIONS: readonly InputAction[] = ['ability1', 'ability2', 'ability3'];
@@ -124,6 +126,7 @@ export function fighterView(match: Match, i: 0 | 1): FighterView {
     effects,
     wins: f.wins,
     state: f.state,
+    notice: match.texts.filter((t) => t.side === i && t.kind === 'info').at(-1)?.text,
   };
 }
 

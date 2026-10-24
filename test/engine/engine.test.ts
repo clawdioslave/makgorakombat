@@ -145,6 +145,29 @@ describe('the auto-attack', () => {
     expect(match.fighters[0].move).toBe('swing');
   });
 
+  it('a held attack follows the target into reach and keeps landing after the pushback', () => {
+    const match = fighting(4);
+    const held: [Inputs, Inputs] = [inputs({ attack: true }), inputs()];
+    tick(match, held);
+    expect(match.fighters[0].state).toBe('walk');
+    expect(until(match, (m) => m.fighters[0].state === 'attack', 120, held)).toBeGreaterThan(0);
+    let landed = 0;
+    for (let f = 0; f < 600; f++) {
+      rig(match, 'hit');
+      tick(match, held);
+      if (match.texts.some((t) => t.t === 1 && t.side === 1 && t.kind === 'damage')) landed++;
+    }
+    expect(landed).toBeGreaterThanOrEqual(4);
+  });
+
+  it('a tap out of reach says OUT OF RANGE once and does not follow', () => {
+    const match = fighting(4);
+    tick(match, [inputs({ attack: true }), inputs()]);
+    run(match, 10);
+    expect(match.fighters[0].state).toBe('idle');
+    expect(texts(match, 0)).toEqual(['info:OUT OF RANGE']);
+  });
+
   it('cycles the swing animation variations', () => {
     const match = fighting(1.5);
     const seen = new Set<number>();

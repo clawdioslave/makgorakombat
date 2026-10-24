@@ -253,7 +253,7 @@ const SLOW_FACTOR = 0.5;
 const BLOCK_FACTOR = 0.6;
 const CRIT_FACTOR = 2;
 /** Speed given to the target by a blow; it decays by 0.82 a frame, so the distance is about 5.5 times this. The game has none; a nudge sells the impact. */
-const PUSHBACK = { swing: 0.02, ability: 0.08, spell: 0.04, bolt: 0.06, charge: 0.2 } as const;
+const PUSHBACK = { swing: 0.02, ability: 0.05, spell: 0.03, bolt: 0.05, charge: 0.2 } as const;
 
 /** The hit table. Parry only from the front, block only with a shield, none of them against a helpless target. */
 export const HIT_TABLE = { miss: 0.05, dodge: 0.06, evasion: 0.5, parry: 0.06, block: 0.1, crit: 0.15, spellMiss: 0.03 } as const;
@@ -664,6 +664,12 @@ function applyInputs(match: Match, i: 0 | 1, inputs: Inputs): void {
     const wanted: MoveRef = forward ? 'walk' : 'back';
     if (f.move !== wanted || f.state !== wanted) play(f, wanted, wanted);
     f.x += dir * (forward ? WALK : BACK) * (f.slowT > 0 ? SLOW_FACTOR : 1);
+    return;
+  }
+  // Holding the attack with nowhere else to go follows the target into reach, as the game's follow does.
+  if (f.auto && !table.weapon.ranged && !inReach(f, o, table.weapon.range, false) && Math.abs(o.z - f.z) < 1.2 && o.state !== 'death') {
+    if (f.move !== 'walk' || f.state !== 'walk') play(f, 'walk', 'walk');
+    f.x += f.facing * WALK * (f.slowT > 0 ? SLOW_FACTOR : 1);
     return;
   }
   // A move past its recover point plays out unless something else is asked for.

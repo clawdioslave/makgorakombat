@@ -248,6 +248,8 @@ function floatingTexts(ctx: CanvasRenderingContext2D, match: Match, at: (p: read
   // Texts born on the same frame over the same fighter stack up instead of overlapping.
   const stack: Record<string, number> = {};
   for (const text of match.texts) {
+    // The refusals (NOT ENOUGH RAGE, OUT OF RANGE) are the DOM layer's to show, from the view's `notice`.
+    if (text.kind === 'info') continue;
     const style = styleOf(text, human);
     const key = `${text.side}:${text.t}`;
     const slot = stack[key] ?? 0;
@@ -256,10 +258,10 @@ function floatingTexts(ctx: CanvasRenderingContext2D, match: Match, at: (p: read
     if (!p) continue;
     const born = match.frame - text.t;
     // The fan: each text takes a lane from -2 to 2 by its birth frame, so a stream of hits spreads out.
-    const lane = text.kind === 'info' ? 0 : ((born * 7 + slot * 3) % 5) - 2;
-    const rise = text.kind === 'info' ? text.t * 0.4 : text.t * 0.85;
+    const lane = ((born * 7 + slot * 3) % 5) - 2;
+    const rise = text.t * 0.85;
     const x = p[0] + lane * 16;
-    const y = text.kind === 'info' ? p[1] + 60 - rise : p[1] - 30 - rise - slot * 22;
+    const y = p[1] - 30 - rise - slot * 22;
     const fade = Math.min(1, (text.life - text.t) / 18);
     let scale = 1;
     if (text.kind === 'crit') {
