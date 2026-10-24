@@ -7,6 +7,7 @@ import { Fight } from './Fight';
 import { type BuiltFighter, Fighters } from './fighters';
 import { messageOf, useFolder } from './folder';
 import { pictureUrl } from './pixels';
+import { LEGENDS, legendTiles, type Tile } from './roster';
 import { Select, type Source } from './Select';
 import { Title } from './Title';
 import { Versus } from './Versus';
@@ -27,6 +28,7 @@ interface Loaded {
   classes: ClassEntry[];
   portraits: { races: Map<string, string>; classes: Map<string, string> };
   screens: LoadingScreen[];
+  legends: Tile[];
   fighters: Fighters;
 }
 
@@ -49,7 +51,7 @@ export function Game() {
     const data = client.current!;
     void (async () => {
       try {
-        const [races, classes, portraits, screens] = await Promise.all([
+        const [races, classes, portraits, screens, looks] = await Promise.all([
           data.races(),
           data.classList(),
           data.portraits().catch((cause: unknown) => {
@@ -57,6 +59,11 @@ export function Game() {
             return { races: {}, classes: {}, problems: [] };
           }),
           data.backdrops().catch(() => [] as LoadingScreen[]),
+          // The legends this folder can draw; a folder whose creature tables cannot be read just has none.
+          data.creatureDisplays(LEGENDS.flatMap((legend) => legend.displays)).catch((cause: unknown) => {
+            console.warn('The legends could not be looked up:', cause);
+            return [];
+          }),
         ]);
         if (stale) return;
         if (portraits.problems.length > 0) console.warn('Portraits:', portraits.problems.join('; '));
@@ -66,6 +73,7 @@ export function Game() {
           classes,
           portraits: { races: urls(portraits.races), classes: urls(portraits.classes) },
           screens,
+          legends: legendTiles(LEGENDS, looks, races),
           fighters: new Fighters(data, classes),
         });
       } catch (cause) {
@@ -94,6 +102,7 @@ export function Game() {
           races={loaded.races}
           classes={loaded.classes}
           records={records}
+          legends={loaded.legends}
           portraits={loaded.portraits}
           fighters={loaded.fighters}
           p2={p2}

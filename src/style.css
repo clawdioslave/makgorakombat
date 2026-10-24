@@ -344,7 +344,8 @@ code {
   gap: 5px;
 }
 
-.tiles.champions {
+.tiles.champions,
+.tiles.legends {
   grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
 }
 
@@ -365,6 +366,15 @@ code {
 
 .tile.horde {
   border-color: #6b1a1f;
+}
+
+.tile.legend {
+  border-color: var(--gold);
+}
+
+.tile.legend .name {
+  justify-content: center;
+  color: var(--gold);
 }
 
 .tile img {

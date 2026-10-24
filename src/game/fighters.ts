@@ -1,4 +1,4 @@
-import type { ClassEntry, Race } from '@mogshot/character/appearance';
+import type { ClassEntry } from '@mogshot/character/appearance';
 import type { ItemSetInfo, Slot } from '@mogshot/character/equipment';
 import { posableRig, type PosableRig } from '@mogshot/model/posable';
 import type { FighterResult, FightSoundSet } from '@mogshot/worker/api';
@@ -16,14 +16,16 @@ import type { Tile } from './roster';
 export interface Champion {
   /** Stable key of the build, for the cache. */
   key: string;
-  /** "NIGHT ELF" / "Scarletfire" and "DRUID". */
+  /** "NIGHT ELF" / "Scarletfire" / "TYRANDE WHISPERWIND" and "DRUID" / "HIGH PRIESTESS OF ELUNE". */
   name: string;
   title: string;
-  race: Race;
+  raceId: number;
   sex: number;
   classId: number | undefined;
   choices: [number, number][];
   gear: [Slot, number][];
+  /** A legend: the creature display the worker builds as the game draws it; raceId and sex are then its. */
+  npc?: number;
 }
 
 export interface BuiltFighter {
@@ -46,6 +48,19 @@ export class Fighters {
   /** The champion a tile stands for with the player's sex and class choices applied. */
   async champion(tile: Tile, sex: number, classId: number | undefined): Promise<Champion | undefined> {
     if (tile.kind === 'random') return undefined;
+    if (tile.kind === 'legend') {
+      return {
+        key: `legend:${tile.legend.slug}:${tile.displayId}`,
+        name: tile.legend.name.toUpperCase(),
+        title: tile.legend.title.toUpperCase(),
+        raceId: tile.raceId,
+        sex: tile.sex,
+        classId: undefined,
+        choices: [],
+        gear: [],
+        npc: tile.displayId,
+      };
+    }
     const className = (id: number | undefined) => this.classes.find((c) => c.id === id)?.name.toUpperCase() ?? '';
     if (tile.kind === 'record') {
       const imported = await this.client.resolveImport(tile.record);
@@ -53,7 +68,7 @@ export class Fighters {
         key: `record:${tile.record.key}`,
         name: tile.record.name.toUpperCase(),
         title: `${tile.race.name.toUpperCase()} ${className(imported.classId ?? tile.record.classId)}`.trim(),
-        race: tile.race,
+        raceId: tile.race.id,
         sex: imported.sex,
         classId: imported.classId ?? tile.record.classId,
         choices: imported.choices,
@@ -65,7 +80,7 @@ export class Fighters {
       key: `race:${tile.race.id}:${sex}:${classId ?? 0}`,
       name: tile.race.name.toUpperCase(),
       title: className(classId),
-      race: tile.race,
+      raceId: tile.race.id,
       sex,
       classId,
       choices: [],
@@ -87,13 +102,14 @@ export class Fighters {
   get(champion: Champion): Promise<BuiltFighter> {
     let fighter = this.built.get(champion.key);
     if (!fighter) {
-      fighter = this.client.fighter(champion.race.id, champion.sex, champion.choices, champion.gear, [...ALL_MOVE_NAMES]).then((result) => {
+      fighter = this.client.fighter(champion.raceId, champion.sex, champion.choices, champion.gear, [...ALL_MOVE_NAMES], champion.npc).then((result) => {
         const rig = posableRig(result.rig);
         if (rig.meshCount !== result.scene.meshes.length) throw new Error(`The fighter's rig has ${rig.meshCount} meshes for ${result.scene.meshes.length} in the scene`);
+        if (result.scene.problems.length > 0) console.warn(`${champion.name}: ${result.scene.problems.join('; ')}`);
         // The weapon's own swing and impact come from the main hand; the voice from the race and sex built.
         const mainHand = champion.gear.find(([slot]) => slot === 'mainHand')?.[1];
         const sounds = this.client
-          .sounds(champion.race.id, champion.sex, champion.classId, mainHand, result.wielding)
+          .sounds(champion.raceId, champion.sex, champion.classId, mainHand, result.wielding)
           .catch((error: unknown) => {
             console.warn(`${champion.name} has no sound:`, error);
             return undefined;
