@@ -57,7 +57,8 @@ export class Fighters {
         sex: tile.sex,
         classId: undefined,
         choices: [],
-        gear: [],
+        // The display's hands are empty: the legend's signature weapon goes in them.
+        gear: Object.entries(tile.legend.weapons ?? {}).flatMap(([slot, id]) => (id ? [[slot as Slot, id] as [Slot, number]] : [])),
         npc: tile.displayId,
       };
     }

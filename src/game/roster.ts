@@ -26,6 +26,8 @@ export interface Legend {
    * the list with a `note` saying why, and gets no tile.
    */
   displays: number[];
+  /** The legend's signature weapon, by item id, worn over the display's empty hands. */
+  weapons?: { mainHand?: number; offHand?: number };
   note?: string;
 }
 
@@ -44,18 +46,18 @@ export type Tile =
  */
 export const LEGENDS: Legend[] = [
   // The white robe: Legion's Tyrande in retail, the original in the classic beta.
-  { slug: 'tyrande', name: 'Tyrande Whisperwind', title: 'High Priestess of Elune', faction: 'alliance', displays: [73234, 7274] },
+  { slug: 'tyrande', name: 'Tyrande Whisperwind', title: 'High Priestess of Elune', faction: 'alliance', displays: [73234, 7274], weapons: { mainHand: 266096 } },
   // Retail's black-plate Thrall (npc 253222) and the classic one.
-  { slug: 'thrall', name: 'Thrall', title: 'Warchief of the Horde', faction: 'horde', displays: [19015, 4527] },
+  { slug: 'thrall', name: 'Thrall', title: 'Warchief of the Horde', faction: 'horde', displays: [19015, 4527], weapons: { mainHand: 128819 } },
   // Only the classic beta has her banshee queen look on a player model; every retail look is a model of her own.
-  { slug: 'sylvanas', name: 'Sylvanas Windrunner', title: 'Banshee Queen', faction: 'horde', displays: [11657] },
-  { slug: 'malfurion', name: 'Malfurion Stormrage', title: 'Archdruid', faction: 'alliance', displays: [127688, 39162] },
+  { slug: 'sylvanas', name: 'Sylvanas Windrunner', title: 'Banshee Queen', faction: 'horde', displays: [11657], weapons: { mainHand: 128826 } },
+  { slug: 'malfurion', name: 'Malfurion Stormrage', title: 'Archdruid', faction: 'alliance', displays: [127688, 39162], weapons: { mainHand: 128306 } },
   // Before the Betrayer: the Moon Guard captain of the War of the Ancients. The demon hunter is a model of his own.
-  { slug: 'illidan', name: 'Illidan Stormrage', title: 'Captain of the Moon Guard', faction: 'neutral', displays: [72623] },
+  { slug: 'illidan', name: 'Illidan Stormrage', title: 'Captain of the Moon Guard', faction: 'neutral', displays: [72623], weapons: { mainHand: 32837, offHand: 32838 } },
   // Young Varian (npc 68925); King Varian is a model of his own.
-  { slug: 'varian', name: 'Varian Wrynn', title: 'Prince of Stormwind', faction: 'alliance', displays: [47044] },
-  { slug: 'cairne', name: 'Cairne Bloodhoof', title: 'High Chieftain', faction: 'horde', displays: [64785, 4307] },
-  { slug: 'voljin', name: "Vol'jin", title: 'Darkspear Chieftain', faction: 'horde', displays: [10357] },
+  { slug: 'varian', name: 'Varian Wrynn', title: 'Prince of Stormwind', faction: 'alliance', displays: [47044], weapons: { mainHand: 253230 } },
+  { slug: 'cairne', name: 'Cairne Bloodhoof', title: 'High Chieftain', faction: 'horde', displays: [64785, 4307], weapons: { mainHand: 128808 } },
+  { slug: 'voljin', name: "Vol'jin", title: 'Darkspear Chieftain', faction: 'horde', displays: [10357], weapons: { mainHand: 280842 } },
   { slug: 'jaina', name: 'Jaina Proudmoore', title: 'Lady of Theramore', faction: 'alliance', displays: [], note: 'Every look of hers the retail files name (87892, 80015, 46819 and the rest) is a model of her own; the classic Theramore look is not named in either install.' },
   { slug: 'arthas', name: 'Arthas Menethil', title: 'The Lich King', faction: 'neutral', displays: [], note: 'Prince Arthas (27545) and the Lich King (22234, 24191, 121920) are models of their own.' },
   { slug: 'garrosh', name: 'Garrosh Hellscream', title: 'Warchief', faction: 'horde', displays: [], note: 'His looks (32904, 56248, 87839) are models of their own; the Garrosh\'ar grunts are not him.' },

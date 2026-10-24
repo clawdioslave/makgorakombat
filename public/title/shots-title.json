@@ -1,4 +1,4 @@
 [
-  { "out": "tyrande.png", "npc": 73234, "pose": "Ready", "camera": { "yaw": -32, "pitch": 4 } },
-  { "out": "thrall.png", "npc": 19015, "pose": "Ready", "camera": { "yaw": 32, "pitch": 4 } }
+  { "out": "tyrande.png", "npc": 73234, "pose": "Ready", "gear": { "mainHand": 266096 }, "camera": { "yaw": -32, "pitch": 4 } },
+  { "out": "thrall.png", "npc": 19015, "pose": "Ready", "gear": { "mainHand": 128819 }, "camera": { "yaw": 32, "pitch": 4 } }
 ]
