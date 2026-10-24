@@ -84,7 +84,15 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
     rows.push({ zone: 'roster', tiles: roster });
     return rows;
   }, [legends, champions, roster]);
-  const [players, setPlayers] = useState<[Player, Player]>(() => [freshPlayer(1), freshPlayer(0)]);
+  // The ring opens on Tyrande against Thrall when the folder has them; otherwise on the roster.
+  const [players, setPlayers] = useState<[Player, Player]>(() => {
+    const opening = (slug: string, sex: number): Player => {
+      const index = legends.findIndex((tile) => tile.kind === 'legend' && tile.legend.slug === slug);
+      const player = freshPlayer(sex);
+      return index >= 0 ? { ...player, cursor: { zone: 'legends', index } } : player;
+    };
+    return [opening('tyrande', 1), opening('thrall', 0)];
+  });
   const playersRef = useRef(players);
   playersRef.current = players;
   const p2Ref = useRef(p2);

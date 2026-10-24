@@ -1,3 +1,12 @@
+/* LifeCraft, the fan-made Warcraft lettering, for the MAK'GORA half of the logo. */
+@font-face {
+  font-family: 'LifeCraft';
+  src: url('/makgorakombat/fonts/LifeCraft.woff2') format('woff2'), url('/makgorakombat/fonts/LifeCraft.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
   --bg: #0b0708;
@@ -15,6 +24,7 @@
   --p1: #ff3b3b;
   --p2: #3b8bff;
   --serif: 'Cinzel', Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+  --warcraft: 'LifeCraft', 'Cinzel', Palatino, serif;
   --heavy: 'Metal Mania', Impact, 'Arial Black', sans-serif;
   font: 16px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
@@ -76,10 +86,10 @@ code {
 }
 
 .logo .makgora {
-  font-family: var(--serif);
-  font-weight: 900;
-  font-size: 4.4rem;
-  letter-spacing: 0.04em;
+  font-family: var(--warcraft);
+  font-weight: normal;
+  font-size: 5rem;
+  letter-spacing: 0.02em;
   color: var(--gold);
   text-shadow:
     0 0 2px #000,
@@ -99,7 +109,7 @@ code {
 }
 
 .logo.small .makgora {
-  font-size: 1.6rem;
+  font-size: 1.85rem;
 }
 
 .logo.small .kombat {
@@ -107,6 +117,88 @@ code {
 }
 
 /* ---- the title ------------------------------------------------------------------------- */
+
+.title .faceoff {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: -1;
+}
+
+.title .champion {
+  position: absolute;
+  bottom: -2vh;
+  height: 92vh;
+  width: auto;
+  max-width: 30vw;
+  object-fit: contain;
+  object-position: bottom;
+  filter: drop-shadow(0 0 40px rgba(0, 0, 0, 0.9));
+  animation: enter 0.9s cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+
+.title .champion.left {
+  left: 1vw;
+  --from: -12vw;
+}
+
+.title .champion.right {
+  right: -6vw;
+  height: 90vh;
+  max-width: 46vw;
+  --from: 12vw;
+}
+
+@media (max-width: 1000px) {
+  .title .champion {
+    opacity: 0.35;
+  }
+}
+
+.title .drop {
+  background: rgba(8, 4, 5, 0.82);
+  box-shadow: 0 0 60px 30px rgba(8, 4, 5, 0.7);
+}
+
+@keyframes enter {
+  from {
+    transform: translateX(var(--from));
+    opacity: 0;
+  }
+}
+
+.title .billing {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-family: var(--heavy);
+  font-size: 2rem;
+  letter-spacing: 0.08em;
+  text-shadow: 0 3px 0 #000, 0 6px 18px rgba(0, 0, 0, 0.8);
+}
+
+.title .billing .p1 {
+  color: var(--p1);
+}
+
+.title .billing .p2 {
+  color: var(--p2);
+}
+
+.title .billing .vs {
+  color: var(--blood);
+  font-size: 2.6rem;
+}
+
+.title .drop,
+.title .credits,
+.title .logo,
+.title .tagline,
+.title .billing {
+  position: relative;
+  z-index: 1;
+}
 
 .title {
   justify-content: center;
