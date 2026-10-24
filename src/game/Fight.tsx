@@ -29,6 +29,10 @@ const MAX_STEPS = 4;
 /** How hard the camera shakes for each kind of landed blow, in pan units (a fraction of half the view's height). */
 const SHAKE: Record<Spark['kind'], number> = { hit: 0.025, crit: 0.06, spell: 0.03, block: 0.012, parry: 0.015, dot: 0 };
 const SHAKE_DECAY = 0.82;
+/** How fast the camera pushes in on a fatality and comes back, per frame. */
+const PUSH_EASE = 0.07;
+/** The view sinks a little as it pushes in, so the feet stay in frame; in pan units per unit of push. */
+const PUSH_SINK = 0.16;
 
 /** The camera's shake: kicked by each new spark, dying away over a few frames, deterministic in the frame count. */
 class Shaker {
@@ -44,6 +48,11 @@ class Shaker {
     }
     this.amount *= SHAKE_DECAY;
     if (this.amount < 0.0005) this.amount = 0;
+  }
+
+  /** A kick from outside the sparks: a fatality's blow. */
+  kick(amount: number): void {
+    this.amount = Math.max(this.amount, amount);
   }
 
   /** The camera offset this frame. */
@@ -109,6 +118,8 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
     let owed = 0;
     const times = { engine: 0, pose: 0, draw: 0 };
     const shaker = new Shaker();
+    let push = 1;
+    let hitsSeen = 0;
     const loop = (now: number) => {
       frame = requestAnimationFrame(loop);
       const current = match.current!;
@@ -127,10 +138,20 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
       if (steps > 0) {
         mixer.observe(current);
         shaker.observe(current);
+        // A fatality's blow shakes as its beat says.
+        const run = current.fatality;
+        if (run && current.phase === 'fatality' && run.hits !== hitsSeen) {
+          shaker.kick(current.tables[current.roundWinner ?? 0].fatality.spec.beats[run.beat]?.shake ?? 0);
+        }
+        hitsSeen = run?.hits ?? 0;
       }
       const t1 = performance.now();
       const shake = shaker.offset(current.frame);
-      const camera = { ...CAMERA, panX: CAMERA.panX + shake.x, panY: CAMERA.panY + shake.y };
+      // The camera pushes in on the pair for the fatality and eases back out with the round's end.
+      const cinematic = current.fatality !== undefined && (current.phase === 'fatality' || current.phase === 'ko');
+      const wantPush = cinematic ? current.tables[current.roundWinner ?? 0].fatality.spec.push : 1;
+      push += (wantPush - push) * PUSH_EASE;
+      const camera = { ...CAMERA, zoom: CAMERA.zoom / push, panX: CAMERA.panX + shake.x, panY: CAMERA.panY + shake.y - (push - 1) * PUSH_SINK };
       ring.frame(current.fighters.map((fighter) => fighter.x));
       ring.draw(
         current.fighters.map((fighter, i) => ({ ...poseOf(current, i as 0 | 1), x: fighter.x, z: fighter.z, facing: fighter.facing })),
@@ -149,7 +170,7 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
       const note = debugRef.current
         ? `engine ${times.engine.toFixed(2)} ms · pose+draw ${times.pose.toFixed(2)} ms · hud ${times.draw.toFixed(2)} ms · sounds ${mixer.played}`
         : mutedRef.current ? 'MUTED · M' : undefined;
-      drawHud(ctx, hud.width, hud.height, current, names, (point) => ring.project(camera, point), { human: [true, p2 !== 'cpu'], debug: note });
+      drawHud(ctx, hud.width, hud.height, current, names, (point) => ring.project(camera, point), { human: [true, p2 !== 'cpu'], debug: note, sources: [input.source(0), input.source(1)] });
     };
     frame = requestAnimationFrame(loop);
 

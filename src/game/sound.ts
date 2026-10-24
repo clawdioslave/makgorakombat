@@ -107,6 +107,9 @@ export class Mixer {
   private last: [{ state: string; move: string; t: number } | undefined, { state: string; move: string; t: number } | undefined] = [undefined, undefined];
   private lastBanner: string | undefined;
   private lastMatch: Match | undefined;
+  /** The fatality's beat and blows seen so far. */
+  private lastBeat = -1;
+  private lastHits = 0;
   private readonly onUnlock = () => void this.decodeAll();
 
   constructor() {
@@ -181,6 +184,8 @@ export class Mixer {
       this.lastProjectiles = [];
       this.last = [undefined, undefined];
       this.lastBanner = undefined;
+      this.lastBeat = -1;
+      this.lastHits = 0;
     }
     const [a, b] = match.fighters;
 
@@ -199,6 +204,27 @@ export class Mixer {
       }
     }
     this.lastBanner = banner;
+
+    // The fatality: a gong and the winner's roar as it begins, the loser's cry at each blow. The
+    // winner's grunts come with each beat's move and the death cry with the death, through the paths below.
+    const run = match.fatality;
+    if (run && match.phase === 'fatality' && match.roundWinner !== undefined) {
+      const winner = match.roundWinner;
+      const loser = winner === 0 ? 1 : 0;
+      if (this.lastBeat === -1) {
+        this.play(0, 'gong', 0, 0, 0.6);
+        this.play(winner, 'roar', match.fighters[winner].x, 0.1);
+      }
+      this.lastBeat = run.beat;
+      if (run.hits !== this.lastHits) {
+        const beat = match.tables[winner].fatality.spec.beats[run.beat];
+        this.play(loser, beat?.impact === 'crit' ? 'injuryCrit' : 'injury', match.fighters[loser].x, 0.04);
+        this.lastHits = run.hits;
+      }
+    } else {
+      this.lastBeat = -1;
+      this.lastHits = 0;
+    }
 
     // Moves that started since last frame: a swing, a cry, a death.
     for (let i = 0 as 0 | 1; i < 2; i++) {
