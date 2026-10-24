@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { Image } from '@mogshot/formats/blp';
-import type { LoadingScreen } from '@mogshot/worker/api';
 import { cpuInputs } from '../engine/cpu';
 import { type Inputs, type Match, newMatch, poseOf, tick } from '../engine/engine';
 import { InputReader } from '../engine/input';
@@ -11,6 +9,7 @@ import { drawHud } from './hud';
 import { seedOf } from './pixels';
 import { isMuted, Mixer, toggleMute } from './sound';
 import type { Source } from './Select';
+import type { Ground } from './stages';
 
 /*
  * The fight. The engine steps sixty times a second whatever the screen does; each frame the
@@ -19,7 +18,7 @@ import type { Source } from './Select';
 
 interface FightProps {
   fighters: [BuiltFighter, BuiltFighter];
-  stage: { screen: LoadingScreen | undefined; image: Image | undefined };
+  stage: Ground;
   p2: Source;
   onBack: () => void;
 }
@@ -42,7 +41,7 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
   useEffect(() => {
     const ring = new Arena(canvas.current!);
     ring.setFighters(fighters);
-    ring.setScreen(stage.screen, stage.image);
+    ring.setGround(stage);
     const names: [string, string] = [fighters[0].champion.name, fighters[1].champion.name];
     const seed = seedOf(fighters[0].champion.key + fighters[1].champion.key) + rematch.current;
     match.current = newMatch([fighters[0].moves, fighters[1].moves], seed, names);

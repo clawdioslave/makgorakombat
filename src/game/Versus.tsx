@@ -3,31 +3,45 @@ import type { Image } from '@mogshot/formats/blp';
 import { CLASSIC_SCREEN_ASPECT, composeBackdrop } from '@mogshot/render/backdrop';
 import type { LoadingScreen } from '@mogshot/worker/api';
 import type { DataClient } from '@mogshot/worker/client';
+import type { PlaceScene } from '@mogshot/world/place';
 import { CAMERA, START_X } from '../engine/stage';
 import { Arena } from './arena';
 import type { BuiltFighter } from './fighters';
+import { facingRadians, type Ground, type Stage, thumbnailUrl } from './stages';
 
 /*
- * The two champions face each other across the ring while a stage is picked from the game's
- * loading screens. Enter fights; Escape goes back to the roster.
+ * The two champions face each other across the ring while the ground is picked: a stage in the
+ * game world, read from the open folder's map files and raised around them while they wait, or,
+ * further along the strip, one of the game's loading screens. Enter fights; Escape goes back.
  */
 
 interface VersusProps {
   client: DataClient;
   fighters: [BuiltFighter, BuiltFighter];
+  /** The stages this install can draw. */
+  stages: Stage[];
   screens: LoadingScreen[];
-  onFight: (screen: LoadingScreen | undefined, image: Image | undefined) => void;
+  onFight: (ground: Ground) => void;
   onBack: () => void;
 }
 
-const STAGE_LIKE = /arena|gurubashi|nagrand|coliseum|colosseum|durotar|orgrimmar|stranglethorn|barrens|valley of trials|ring/i;
+type Entry = { kind: 'stage'; stage: Stage } | { kind: 'screen'; screen: LoadingScreen };
 
-export function Versus({ client, fighters, screens, onFight, onBack }: VersusProps) {
+const STAGE_LIKE = /arena|gurubashi|nagrand|coliseum|colosseum|durotar|orgrimmar|stranglethorn|barrens|valley of trials|ring/i;
+/** How many raised places are kept while the strip is browsed; a place is a few hundred megabytes of world. */
+const KEEP_PLACES = 3;
+
+const keyOf = (entry: Entry) => (entry.kind === 'stage' ? `stage:${entry.stage.slug}` : `screen:${entry.screen.id}`);
+
+export function Versus({ client, fighters, stages, screens, onFight, onBack }: VersusProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const arena = useRef<Arena>(null);
-  const [cursor, setCursor] = useState(() => Math.max(0, screens.findIndex((screen) => STAGE_LIKE.test(screen.name))));
+  const entries: Entry[] = [...stages.map((stage): Entry => ({ kind: 'stage', stage })), ...screens.map((screen): Entry => ({ kind: 'screen', screen }))];
+  const [cursor, setCursor] = useState(() => (stages.length > 0 ? 0 : Math.max(0, screens.findIndex((screen) => STAGE_LIKE.test(screen.name)))));
   const [thumbs, setThumbs] = useState<Map<number, string>>(new Map());
+  const [status, setStatus] = useState<string>();
   const images = useRef(new Map<number, Promise<Image | undefined>>());
+  const places = useRef(new Map<string, Promise<PlaceScene>>());
   const cursorRef = useRef(cursor);
   cursorRef.current = cursor;
   const started = useRef(performance.now());
@@ -38,11 +52,30 @@ export function Versus({ client, fighters, screens, onFight, onBack }: VersusPro
     return image;
   };
 
-  // Thumbnails around the cursor, drawn as the game shows them.
+  /** The world around a stage's spot, read once and kept while it is near the cursor. */
+  const placeOf = (stage: Stage) => {
+    const kept = places.current;
+    let place = kept.get(stage.slug);
+    if (place) {
+      // Most recently wanted last.
+      kept.delete(stage.slug);
+      kept.set(stage.slug, place);
+      return place;
+    }
+    place = client.place(stage.map, stage.x, stage.y, facingRadians(stage), stage.reach, stage.z);
+    place.catch(() => kept.delete(stage.slug));
+    kept.set(stage.slug, place);
+    while (kept.size > KEEP_PLACES) kept.delete(kept.keys().next().value!);
+    return place;
+  };
+
+  // Thumbnails of the loading screens around the cursor, drawn as the game shows them. Stages ship theirs.
   useEffect(() => {
     let stale = false;
-    const around = screens.slice(Math.max(0, cursor - 8), cursor + 9);
-    for (const screen of around) {
+    const around = entries.slice(Math.max(0, cursor - 8), cursor + 9);
+    for (const entry of around) {
+      if (entry.kind !== 'screen') continue;
+      const { screen } = entry;
       if (thumbs.has(screen.fileId)) continue;
       void imageOf(screen).then((image) => {
         if (stale || !image) return;
@@ -57,19 +90,7 @@ export function Versus({ client, fighters, screens, onFight, onBack }: VersusPro
       stale = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cursor, screens]);
-
-  // The screen behind the ring follows the cursor.
-  useEffect(() => {
-    const screen = screens[cursor];
-    if (!screen) return;
-    let stale = false;
-    void imageOf(screen).then((image) => !stale && arena.current?.setScreen(screen, image));
-    return () => {
-      stale = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cursor, screens]);
+  }, [cursor, stages, screens]);
 
   useEffect(() => {
     const ring = (arena.current ??= new Arena(canvas.current!));
@@ -95,18 +116,53 @@ export function Versus({ client, fighters, screens, onFight, onBack }: VersusPro
     return () => cancelAnimationFrame(frame);
   }, [fighters]);
 
+  // The ground under the ring follows the cursor: a stage is raised around the fighters, a screen goes up behind them.
   useEffect(() => {
+    const entry = entries[cursor];
+    if (!entry) return;
+    let stale = false;
+    if (entry.kind === 'stage') {
+      const { stage } = entry;
+      setStatus('RAISING THE GROUND…');
+      placeOf(stage)
+        .then((place) => {
+          if (stale) return;
+          arena.current?.setGround({ stage, place });
+          setStatus(undefined);
+        })
+        .catch((cause: unknown) => {
+          if (stale) return;
+          console.warn(`${stage.name} could not be raised:`, cause);
+          arena.current?.setGround({});
+          setStatus(`THE GROUND WOULD NOT RISE · ${cause instanceof Error ? cause.message : String(cause)}`);
+        });
+    } else {
+      const { screen } = entry;
+      setStatus(undefined);
+      void imageOf(screen).then((image) => !stale && arena.current?.setGround({ screen, image }));
+    }
+    return () => {
+      stale = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cursor, stages, screens]);
+
+  useEffect(() => {
+    const count = entries.length;
     const onKey = (event: KeyboardEvent) => {
       switch (event.code) {
-        case 'ArrowLeft': case 'KeyA': setCursor((c) => (c - 1 + screens.length) % screens.length); break;
-        case 'ArrowRight': case 'KeyD': setCursor((c) => (c + 1) % screens.length); break;
-        case 'ArrowUp': case 'KeyW': setCursor((c) => (c - 8 + screens.length) % screens.length); break;
-        case 'ArrowDown': case 'KeyS': setCursor((c) => (c + 8) % screens.length); break;
+        case 'ArrowLeft': case 'KeyA': setCursor((c) => (c - 1 + count) % count); break;
+        case 'ArrowRight': case 'KeyD': setCursor((c) => (c + 1) % count); break;
+        case 'ArrowUp': case 'KeyW': setCursor((c) => (c - 8 + count * 8) % count); break;
+        case 'ArrowDown': case 'KeyS': setCursor((c) => (c + 8) % count); break;
         case 'Enter': case 'KeyJ': case 'Numpad1': case 'Comma': case 'Space': {
           event.preventDefault();
-          const screen = screens[cursorRef.current];
-          if (!screen) onFight(undefined, undefined);
-          else void imageOf(screen).then((image) => onFight(screen, image));
+          const entry = entries[cursorRef.current];
+          if (!entry) onFight({});
+          else if (entry.kind === 'stage') {
+            // Enter while the ground is still rising waits for it, then fights on it.
+            void placeOf(entry.stage).then((place) => onFight({ stage: entry.stage, place })).catch(() => onFight({}));
+          } else void imageOf(entry.screen).then((image) => onFight({ screen: entry.screen, image }));
           break;
         }
         case 'Escape': onBack(); break;
@@ -116,10 +172,13 @@ export function Versus({ client, fighters, screens, onFight, onBack }: VersusPro
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [screens, onFight, onBack]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stages, screens, onFight, onBack]);
 
   const [a, b] = fighters;
-  const shown = screens.slice(Math.max(0, cursor - 5), cursor + 6);
+  const here = entries[cursor];
+  const shown = entries.slice(Math.max(0, cursor - 5), cursor + 6);
+  const title = here?.kind === 'stage' ? `${here.stage.name} · ${here.stage.where}` : here?.kind === 'screen' ? here.screen.name : 'NO STAGE';
   return (
     <div class="screen versus">
       <canvas class="ring" ref={canvas} />
@@ -135,16 +194,22 @@ export function Versus({ client, fighters, screens, onFight, onBack }: VersusPro
         </div>
       </div>
       <div class="stages">
-        <div class="label">CHOOSE THE GROUND · {screens[cursor]?.name ?? 'NO STAGE'}</div>
+        <div class="label">CHOOSE THE GROUND · {title}</div>
         <div class="strip">
-          {shown.map((screen) => (
-            <div key={screen.id} class={`stage ${screen === screens[cursor] ? 'here' : ''}`} title={screen.name}>
-              {thumbs.get(screen.fileId) ? <img src={thumbs.get(screen.fileId)} alt={screen.name} /> : <span class="dim small">{screen.name}</span>}
+          {shown.map((entry) => (
+            <div key={keyOf(entry)} class={`stage ${entry.kind === 'stage' ? 'world' : ''} ${entry === here ? 'here' : ''}`} title={entry.kind === 'stage' ? entry.stage.why : entry.screen.name}>
+              {entry.kind === 'stage' ? (
+                <img src={thumbnailUrl(entry.stage)} alt={entry.stage.name} />
+              ) : thumbs.get(entry.screen.fileId) ? (
+                <img src={thumbs.get(entry.screen.fileId)} alt={entry.screen.name} />
+              ) : (
+                <span class="dim small">{entry.screen.name}</span>
+              )}
             </div>
           ))}
         </div>
         <div class="controls">
-          <span>← → pick a stage · ↑ ↓ jump eight · <b>Enter</b> fight · <b>Esc</b> back</span>
+          {status ? <span class="status">{status}</span> : <span>← → pick a stage · ↑ ↓ jump eight · <b>Enter</b> fight · <b>Esc</b> back</span>}
         </div>
       </div>
     </div>

@@ -947,6 +947,15 @@ code {
   object-fit: cover;
 }
 
+.versus .stage.world {
+  border-color: #6a5a2a;
+}
+
+.versus .controls .status {
+  color: var(--gold);
+  letter-spacing: 0.15em;
+}
+
 .versus .stage.here {
   transform: scale(1.18);
   border-color: var(--gold);

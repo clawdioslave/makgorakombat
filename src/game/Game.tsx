@@ -10,6 +10,7 @@ import { pictureUrl } from './pixels';
 import { LEGENDS, legendTiles, type Tile } from './roster';
 import { Select, type Source } from './Select';
 import { Title } from './Title';
+import { type Stage, stagesFor, type Ground } from './stages';
 import { Versus } from './Versus';
 
 /*
@@ -21,13 +22,15 @@ import { Versus } from './Versus';
 type Screen =
   | { kind: 'select' }
   | { kind: 'versus'; fighters: [BuiltFighter, BuiltFighter] }
-  | { kind: 'fight'; fighters: [BuiltFighter, BuiltFighter]; stage: { screen: LoadingScreen | undefined; image: Image | undefined } };
+  | { kind: 'fight'; fighters: [BuiltFighter, BuiltFighter]; stage: Ground };
 
 interface Loaded {
   races: Race[];
   classes: ClassEntry[];
   portraits: { races: Map<string, string>; classes: Map<string, string> };
   screens: LoadingScreen[];
+  /** The stages in the world this install can draw. */
+  stages: Stage[];
   legends: Tile[];
   fighters: Fighters;
 }
@@ -51,7 +54,7 @@ export function Game() {
     const data = client.current!;
     void (async () => {
       try {
-        const [races, classes, portraits, screens, looks] = await Promise.all([
+        const [races, classes, portraits, screens, looks, maps] = await Promise.all([
           data.races(),
           data.classList(),
           data.portraits().catch((cause: unknown) => {
@@ -64,6 +67,11 @@ export function Game() {
             console.warn('The legends could not be looked up:', cause);
             return [];
           }),
+          // Which maps are on disk, for the stages; an install whose map table cannot be read fights on loading screens.
+          data.maps().catch((cause: unknown) => {
+            console.warn('The maps could not be listed:', cause);
+            return [];
+          }),
         ]);
         if (stale) return;
         if (portraits.problems.length > 0) console.warn('Portraits:', portraits.problems.join('; '));
@@ -73,6 +81,7 @@ export function Game() {
           classes,
           portraits: { races: urls(portraits.races), classes: urls(portraits.classes) },
           screens,
+          stages: stagesFor(maps.map((map) => map.id)),
           legends: legendTiles(LEGENDS, looks, races),
           fighters: new Fighters(data, classes),
         });
@@ -116,8 +125,9 @@ export function Game() {
         <Versus
           client={client.current}
           fighters={screen.fighters}
+          stages={loaded.stages}
           screens={loaded.screens}
-          onFight={(stageScreen, image) => setScreen({ kind: 'fight', fighters: screen.fighters, stage: { screen: stageScreen, image } })}
+          onFight={(ground) => setScreen({ kind: 'fight', fighters: screen.fighters, stage: ground })}
           onBack={() => setScreen({ kind: 'select' })}
         />
       );
