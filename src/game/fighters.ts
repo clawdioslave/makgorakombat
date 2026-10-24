@@ -1,7 +1,7 @@
 import type { ClassEntry, Race } from '@mogshot/character/appearance';
 import type { ItemSetInfo, Slot } from '@mogshot/character/equipment';
 import { posableRig, type PosableRig } from '@mogshot/model/posable';
-import type { FighterResult } from '@mogshot/worker/api';
+import type { FighterResult, FightSoundSet } from '@mogshot/worker/api';
 import type { DataClient } from '@mogshot/worker/client';
 import { ALL_MOVE_NAMES, type MoveTable, resolveMoves } from '../engine/moves';
 import type { Tile } from './roster';
@@ -31,6 +31,8 @@ export interface BuiltFighter {
   result: FighterResult;
   rig: PosableRig;
   moves: MoveTable;
+  /** The fighter's sounds, read after the build; undefined when they could not be. */
+  sounds: Promise<FightSoundSet | undefined>;
 }
 
 const KEEP = 8;
@@ -88,7 +90,15 @@ export class Fighters {
       fighter = this.client.fighter(champion.race.id, champion.sex, champion.choices, champion.gear, [...ALL_MOVE_NAMES]).then((result) => {
         const rig = posableRig(result.rig);
         if (rig.meshCount !== result.scene.meshes.length) throw new Error(`The fighter's rig has ${rig.meshCount} meshes for ${result.scene.meshes.length} in the scene`);
-        return { champion, result, rig, moves: resolveMoves(result.scene.animations, result.wielding) };
+        // The weapon's own swing and impact come from the main hand; the voice from the race and sex built.
+        const mainHand = champion.gear.find(([slot]) => slot === 'mainHand')?.[1];
+        const sounds = this.client
+          .sounds(champion.race.id, champion.sex, champion.classId, mainHand, result.wielding)
+          .catch((error: unknown) => {
+            console.warn(`${champion.name} has no sound:`, error);
+            return undefined;
+          });
+        return { champion, result, rig, moves: resolveMoves(result.scene.animations, result.wielding), sounds };
       });
       fighter.catch(() => this.built.delete(champion.key));
       this.built.set(champion.key, fighter);

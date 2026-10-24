@@ -26,7 +26,9 @@ Every move is one of the character's own animations: Ready stances by weapon, At
 | Spell | L | / or Numpad 3 |
 | Block (hold) | U | Right Shift or Numpad 0 |
 
-On the roster: WASD / arrows move the cursor, J or , choose, H or M go back, U or Right Shift switch sex, K L or . / cycle the class. **Tab** switches player 2 between the keyboard, a gamepad and the computer. **Enter** rematches, **Esc** goes back, **F3** shows frame times.
+On the roster: WASD / arrows move the cursor, J or , choose, H or M go back, U or Right Shift switch sex, K L or . / cycle the class. **Tab** switches player 2 between the keyboard, a gamepad and the computer. **Enter** rematches, **Esc** goes back, **M** mutes, **F3** shows frame times.
+
+The fight's sound is read from the game folder like everything else: weapon swings and impacts by the weapon's subclass, the race's own grunts, wounds, death cry and battle roar, a spell for the class (Fireball for a mage, Shadow Bolt for a warlock, Lightning Bolt for a shaman...), and a gong for each round. Browsers keep audio off until a key is pressed, so the first round may start quiet.
 
 ## Running it yourself
 

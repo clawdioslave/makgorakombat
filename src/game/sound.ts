@@ -1,0 +1,282 @@
+import type { FightSoundName, FightSoundSet, SoundKitClips } from '@mogshot/worker/api';
+import { BRAND } from '../engine/brand';
+import type { Fighter, Match, Projectile, Spark } from '../engine/engine';
+
+/*
+ * The fight's sound. The engine says nothing about sound, so the mixer watches the match from
+ * the outside once a frame: a spark that was not there last frame is a hit, a fighter whose move
+ * clock went back started a move, a banner that changed is a round event. Every clip is one of
+ * the player's own game files (see Mogshot's character/sounds.ts for how each was chosen),
+ * decoded once with WebAudio.
+ *
+ * Browsers keep audio silent until the page has seen a key or a click, so the AudioContext is
+ * made on the first key press anywhere and nothing plays before it. M mutes.
+ */
+
+/** The page's one audio context, made on the first key press. */
+let context: AudioContext | undefined;
+let master: GainNode | undefined;
+let muted = false;
+const listeners = new Set<() => void>();
+
+function unlock(): void {
+  if (context) {
+    if (context.state === 'suspended') void context.resume();
+    return;
+  }
+  try {
+    context = new AudioContext();
+    master = context.createGain();
+    master.gain.value = muted ? 0 : 1;
+    master.connect(context.destination);
+  } catch (error) {
+    console.warn('No audio:', error);
+    return;
+  }
+  for (const listener of listeners) listener();
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('keydown', unlock);
+  window.addEventListener('pointerdown', unlock);
+}
+
+export function isMuted(): boolean {
+  return muted;
+}
+
+/** Flip the mute, and say whether sound is now off. */
+export function toggleMute(): boolean {
+  muted = !muted;
+  if (master && context) master.gain.setTargetAtTime(muted ? 0 : 1, context.currentTime, 0.02);
+  return muted;
+}
+
+/** Is the audio context up, so that sounds can play? */
+export function soundReady(): boolean {
+  return context !== undefined;
+}
+
+interface Decoded {
+  kit: number;
+  pitchVariation: [number, number];
+  clips: { buffer: AudioBuffer; volume: number; weight: number }[];
+}
+
+/** One fighter's decoded sounds, by name. */
+class Voice {
+  private readonly decoded = new Map<number, Decoded>();
+  /** Set once the clips are decoded; until then everything is silent. */
+  ready = false;
+
+  constructor(readonly set: FightSoundSet) {}
+
+  async decode(ctx: AudioContext): Promise<void> {
+    await Promise.all(
+      Object.values(this.set.kits).map(async (kit: SoundKitClips) => {
+        const clips: Decoded['clips'] = [];
+        for (const clip of kit.clips) {
+          try {
+            // decodeAudioData takes the buffer, so each clip is copied out of the set.
+            const buffer = await ctx.decodeAudioData(clip.bytes.slice().buffer as ArrayBuffer);
+            clips.push({ buffer, volume: clip.volume, weight: clip.weight });
+          } catch (error) {
+            console.warn(`Sound file ${clip.fileId} did not decode:`, error);
+          }
+        }
+        if (clips.length > 0) this.decoded.set(kit.kit, { kit: kit.kit, pitchVariation: kit.pitchVariation, clips });
+      }),
+    );
+    this.ready = true;
+  }
+
+  pick(name: FightSoundName): Decoded | undefined {
+    const kit = this.set.sounds[name];
+    return kit === undefined ? undefined : this.decoded.get(kit);
+  }
+}
+
+/** Where a fighter's sound seems to come from: left or right of centre, by stage x. */
+const PAN = 0.6;
+
+export class Mixer {
+  private readonly voices: [Voice | undefined, Voice | undefined] = [undefined, undefined];
+  private readonly seenSparks = new WeakSet<Spark>();
+  private readonly seenProjectiles = new WeakSet<Projectile>();
+  private lastProjectiles: Projectile[] = [];
+  private last: [{ state: string; move: string; t: number } | undefined, { state: string; move: string; t: number } | undefined] = [undefined, undefined];
+  private lastBanner: string | undefined;
+  private lastMatch: Match | undefined;
+  private readonly onUnlock = () => void this.decodeAll();
+
+  constructor() {
+    listeners.add(this.onUnlock);
+  }
+
+  /** Give a side its sounds. `undefined` leaves it silent. */
+  async load(side: 0 | 1, set: Promise<FightSoundSet | undefined>): Promise<void> {
+    const loaded = await set;
+    if (!loaded) return;
+    const voice = new Voice(loaded);
+    this.voices[side] = voice;
+    if (context) await voice.decode(context);
+  }
+
+  private async decodeAll(): Promise<void> {
+    if (!context) return;
+    for (const voice of this.voices) if (voice && !voice.ready) await voice.decode(context);
+  }
+
+  dispose(): void {
+    listeners.delete(this.onUnlock);
+  }
+
+  /** How many sounds have gone out: for the console and the headless check. */
+  played = 0;
+
+  /** What each side has loaded, for the console. */
+  summary(): { side: number; kits: number; clips: number; bytes: number; problems: string[] }[] {
+    return this.voices.flatMap((voice, side) => {
+      if (!voice) return [];
+      const kits = Object.values(voice.set.kits);
+      return [{ side, kits: kits.length, clips: kits.reduce((n, k) => n + k.clips.length, 0), bytes: kits.reduce((n, k) => n + k.clips.reduce((m, c) => m + c.bytes.length, 0), 0), problems: voice.set.problems }];
+    });
+  }
+
+  /** Play a side's sound, placed by `x` on the stage, `delay` seconds from now. */
+  play(side: 0 | 1, name: FightSoundName, x = 0, delay = 0, gain = 1): void {
+    const voice = this.voices[side];
+    if (!context || !master || !voice?.ready) return;
+    const sound = voice.pick(name);
+    if (!sound) return;
+    // Weighted choice among the kit's files, as the game does.
+    const total = sound.clips.reduce((n, clip) => n + clip.weight, 0);
+    let roll = Math.random() * total;
+    let clip = sound.clips[0]!;
+    for (const candidate of sound.clips) {
+      roll -= candidate.weight;
+      if (roll <= 0) {
+        clip = candidate;
+        break;
+      }
+    }
+    const source = context.createBufferSource();
+    source.buffer = clip.buffer;
+    const [below, above] = sound.pitchVariation;
+    source.playbackRate.value = 1 - below + Math.random() * (below + above);
+    const volume = context.createGain();
+    volume.gain.value = clip.volume * gain;
+    const pan = context.createStereoPanner();
+    pan.pan.value = Math.max(-1, Math.min(1, (x / 5) * PAN));
+    source.connect(volume).connect(pan).connect(master);
+    source.start(context.currentTime + delay);
+    this.played++;
+  }
+
+  /** Look at the match after this frame's ticks and play what changed. */
+  observe(match: Match): void {
+    if (match !== this.lastMatch) {
+      // A new match: forget the old one's objects.
+      this.lastMatch = match;
+      this.lastProjectiles = [];
+      this.last = [undefined, undefined];
+      this.lastBanner = undefined;
+    }
+    const [a, b] = match.fighters;
+
+    // Round events, from the words on screen.
+    const banner = match.banner?.text;
+    if (banner !== undefined && banner !== this.lastBanner) {
+      if (match.phase === 'intro') {
+        this.play(0, 'gong');
+        this.play(0, 'roar', a.x, 0.5);
+        this.play(1, 'roar', b.x, 1.0);
+      } else if (banner === BRAND.fight) {
+        this.play(0, 'flagUp');
+      } else if (banner === BRAND.ko || banner === BRAND.fatality) {
+        this.play(0, 'flagDown', 0, 0.2);
+        if (banner === BRAND.fatality) this.play(0, 'gong', 0, 0.6, 0.8);
+      }
+    }
+    this.lastBanner = banner;
+
+    // Moves that started since last frame: a swing, a cry, a death.
+    for (let i = 0 as 0 | 1; i < 2; i++) {
+      const f = match.fighters[i];
+      const was = this.last[i];
+      const started = was === undefined ? false : f.move !== was.move || f.state !== was.state || f.t < was.t;
+      if (started) this.onMove(match, i, f);
+      this.last[i] = { state: f.state, move: f.move, t: f.t };
+    }
+
+    // Projectiles: new ones were cast, ones gone with a spark nearby landed.
+    const sparks = match.sparks.filter((spark) => !this.seenSparks.has(spark));
+    for (const spark of sparks) this.seenSparks.add(spark);
+    for (const p of match.projectiles) {
+      if (this.seenProjectiles.has(p)) continue;
+      this.seenProjectiles.add(p);
+      this.play(p.owner, 'cast', p.x);
+    }
+    for (const p of this.lastProjectiles) {
+      if (match.projectiles.includes(p)) continue;
+      const landed = sparks.findIndex((spark) => Math.abs(spark.x - p.x) < 1.2);
+      if (landed < 0) continue;
+      const spark = sparks.splice(landed, 1)[0]!;
+      this.play(p.owner, 'impact', spark.x);
+      if (spark.kind === 'block') this.play(this.attacker(match, p.owner), 'block', spark.x, 0.05);
+    }
+    this.lastProjectiles = [...match.projectiles];
+
+    // Any spark left is a weapon landing: the attacker's weapon on the other's body.
+    for (const spark of sparks) {
+      const attacker = this.attacker(match);
+      this.play(attacker, spark.kind === 'block' ? 'block' : spark.kind === 'crit' ? 'crit' : 'hit', spark.x);
+    }
+  }
+
+  /** Who is swinging right now: the fighter in an attack that has connected; else the one not being hit. */
+  private attacker(match: Match, fallback: 0 | 1 = 0): 0 | 1 {
+    const [a, b] = match.fighters;
+    if (a.state === 'attack' && a.hitDone && !(b.state === 'attack' && b.hitDone)) return 0;
+    if (b.state === 'attack' && b.hitDone && !(a.state === 'attack' && a.hitDone)) return 1;
+    if (a.state === 'attack' && b.state !== 'attack') return 0;
+    if (b.state === 'attack' && a.state !== 'attack') return 1;
+    if (a.state === 'hit' || a.state === 'knockdown' || a.state === 'death' || a.state === 'dazed') return 1;
+    if (b.state === 'hit' || b.state === 'knockdown' || b.state === 'death' || b.state === 'dazed') return 0;
+    return fallback;
+  }
+
+  private onMove(match: Match, i: 0 | 1, f: Fighter): void {
+    switch (f.state) {
+      case 'attack':
+        if (f.move === 'light') {
+          this.play(i, 'swing', f.x, 0.08);
+          if (Math.random() < 0.5) this.play(i, 'exert', f.x);
+        } else if (f.move === 'heavy') {
+          this.play(i, 'swingCrit', f.x, 0.1);
+          this.play(i, 'exertCrit', f.x);
+        } else if (f.move === 'special') {
+          // The cast itself sounds when the projectile leaves the hand.
+          this.play(i, 'exert', f.x);
+        }
+        return;
+      case 'hit':
+        this.play(i, f.move === 'crit' ? 'injuryCrit' : 'injury', f.x, 0.03);
+        return;
+      case 'knockdown':
+        this.play(i, 'injuryCrit', f.x, 0.03);
+        return;
+      case 'death':
+        this.play(i, 'death', f.x, 0.05);
+        return;
+      case 'win':
+        this.play(i, 'cheer', f.x, 0.4);
+        return;
+      case 'finisher':
+        this.play(i, 'exertCrit', f.x);
+        return;
+      default:
+        if (match.phase === 'fight' && f.state === 'jump' && f.move === 'jumpStart') this.play(i, 'exert', f.x, 0, 0.5);
+    }
+  }
+}
