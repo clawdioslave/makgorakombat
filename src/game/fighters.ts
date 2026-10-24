@@ -4,7 +4,7 @@ import { posableRig, type PosableRig } from '@mogshot/model/posable';
 import type { FighterResult, FightSoundSet } from '@mogshot/worker/api';
 import type { DataClient } from '@mogshot/worker/client';
 import { ALL_MOVE_NAMES, type MoveTable, resolveMoves } from '../engine/moves';
-import type { Tile } from './roster';
+import type { Tile, WeaponKit } from './roster';
 
 /*
  * From a tile on the roster to a fighter in the ring: who to build (race, sex, class, gear),
@@ -42,6 +42,7 @@ const KEEP = 8;
 export class Fighters {
   private readonly built = new Map<string, Promise<BuiltFighter>>();
   private readonly sets = new Map<number, Promise<ItemSetInfo[]>>();
+  private readonly found = new Map<string, Promise<boolean>>();
 
   constructor(private readonly client: DataClient, private readonly classes: readonly ClassEntry[]) {}
 
@@ -57,8 +58,8 @@ export class Fighters {
         sex: tile.sex,
         classId: tile.legend.classId,
         choices: [],
-        // The display's hands are empty: the legend's signature weapon goes in them.
-        gear: Object.entries(tile.legend.weapons ?? {}).flatMap(([slot, id]) => (id ? [[slot as Slot, id] as [Slot, number]] : [])),
+        // The display's hands are empty: the legend's own weapons go in them, as this folder has them.
+        gear: await this.weaponKit(tile.legend.weapons ?? []),
         npc: tile.displayId,
       };
     }
@@ -89,6 +90,27 @@ export class Fighters {
     };
   }
 
+  /** Whether the open folder has an item that can be worn in a slot. */
+  private has(slot: Slot, id: number): Promise<boolean> {
+    const key = `${slot}:${id}`;
+    let found = this.found.get(key);
+    if (!found) {
+      found = this.client.searchItems(slot, String(id)).then((result) => result.items.some((item) => item.id === id), () => false);
+      this.found.set(key, found);
+    }
+    return found;
+  }
+
+  /** The first of a legend's weapon kits whose every item the folder has, as item ids by slot; empty when none. */
+  private async weaponKit(kits: readonly WeaponKit[]): Promise<[Slot, number][]> {
+    for (const kit of kits) {
+      const gear = (Object.entries(kit) as [Slot, number | undefined][]).flatMap(([slot, id]) => (id ? [[slot, id] as [Slot, number]] : []));
+      if (gear.length === 0) continue;
+      if ((await Promise.all(gear.map(([slot, id]) => this.has(slot, id)))).every(Boolean)) return gear;
+    }
+    return [];
+  }
+
   /** The class's best set, with weapons to match, as item ids by slot. */
   private async bestKit(classId: number): Promise<[Slot, number][]> {
     let sets = this.sets.get(classId);
@@ -111,10 +133,9 @@ export class Fighters {
     if (!fighter) {
       const build = (gear: [Slot, number][]) => this.client.fighter(champion.raceId, champion.sex, champion.choices, gear, [...ALL_MOVE_NAMES], champion.npc);
       fighter = build(champion.gear).then(async (first) => {
-        // A legend whose signature weapon this install does not have would fight bare-handed:
-        // give it the weapon of its class's set instead, so a shaman has a mace and a hunter a bow.
-        const wantedWeapon = champion.gear.some(([slot]) => slot === 'mainHand');
-        if (first.wielding === 'unarmed' && wantedWeapon && champion.npc !== undefined && champion.classId !== undefined) {
+        // A legend none of whose weapons this install has would fight bare-handed: give it the
+        // weapon of its class's set instead, so a shaman has a mace and a hunter a bow.
+        if (first.wielding === 'unarmed' && champion.npc !== undefined && champion.classId !== undefined) {
           const weapons = await this.setWeapons(champion.classId);
           if (weapons.length > 0) {
             console.warn(`${champion.name}: ${first.scene.problems.join('; ')}; wielding the class set's weapon instead`);

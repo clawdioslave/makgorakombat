@@ -41,6 +41,13 @@ describe('legend tiles', () => {
     expect(LEGENDS.filter((l) => l.displays.length > 0).length).toBeGreaterThanOrEqual(8);
   });
 
+  it('arms every legend that has a look, each kit with a main hand', () => {
+    for (const legend of LEGENDS.filter((l) => l.displays.length > 0)) {
+      expect(legend.weapons?.length, legend.slug).toBeGreaterThan(0);
+      for (const kit of legend.weapons ?? []) expect(kit.mainHand, legend.slug).toBeGreaterThan(0);
+    }
+  });
+
   it('gives a legend with no drawable look no tile', () => {
     expect(legendTiles([jaina], [], RACES)).toEqual([]);
   });
