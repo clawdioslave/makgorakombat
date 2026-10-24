@@ -1,0 +1,116 @@
+import { useEffect, useRef, useState } from 'preact/hooks';
+import type { Image } from '@mogshot/formats/blp';
+import type { LoadingScreen } from '@mogshot/worker/api';
+import { cpuInputs } from '../engine/cpu';
+import { type Inputs, type Match, newMatch, poseOf, tick } from '../engine/engine';
+import { InputReader } from '../engine/input';
+import { CAMERA, TICK_MS } from '../engine/stage';
+import { Arena } from './arena';
+import type { BuiltFighter } from './fighters';
+import { drawHud } from './hud';
+import { seedOf } from './pixels';
+import type { Source } from './Select';
+
+/*
+ * The fight. The engine steps sixty times a second whatever the screen does; each frame the
+ * fighters are posed from the engine's state and the HUD is drawn over them.
+ */
+
+interface FightProps {
+  fighters: [BuiltFighter, BuiltFighter];
+  stage: { screen: LoadingScreen | undefined; image: Image | undefined };
+  p2: Source;
+  onBack: () => void;
+}
+
+const MAX_STEPS = 4;
+
+export function Fight({ fighters, stage, p2, onBack }: FightProps) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const overlay = useRef<HTMLCanvasElement>(null);
+  const stageElement = useRef<HTMLDivElement>(null);
+  const [debug, setDebug] = useState(false);
+  const debugRef = useRef(debug);
+  debugRef.current = debug;
+  const match = useRef<Match>(null);
+  const rematch = useRef(0);
+
+  useEffect(() => {
+    const ring = new Arena(canvas.current!);
+    ring.setFighters(fighters);
+    ring.setScreen(stage.screen, stage.image);
+    const names: [string, string] = [fighters[0].champion.name, fighters[1].champion.name];
+    const seed = seedOf(fighters[0].champion.key + fighters[1].champion.key) + rematch.current;
+    match.current = newMatch([fighters[0].moves, fighters[1].moves], seed, names);
+    // For scripts and the console: the live match.
+    (window as unknown as { mk?: { match: () => Match } }).mk = { match: () => match.current! };
+    const input = new InputReader();
+    input.attach(stageElement.current!);
+    input.setSource(1, p2);
+    stageElement.current!.focus();
+
+    let frame = 0;
+    let last = performance.now();
+    let owed = 0;
+    const times = { engine: 0, pose: 0, draw: 0 };
+    const loop = (now: number) => {
+      frame = requestAnimationFrame(loop);
+      const current = match.current!;
+      owed += Math.min(now - last, 250);
+      last = now;
+      let steps = 0;
+      const t0 = performance.now();
+      while (owed >= TICK_MS && steps < MAX_STEPS) {
+        const inputs: [Inputs, Inputs] = input.read(current);
+        if (p2 === 'cpu') inputs[1] = cpuInputs(current, 1);
+        tick(current, inputs);
+        owed -= TICK_MS;
+        steps++;
+      }
+      if (steps === MAX_STEPS) owed = 0;
+      const t1 = performance.now();
+      ring.frame(current.fighters.map((fighter) => fighter.x));
+      ring.draw(
+        current.fighters.map((fighter, i) => ({ ...poseOf(current, i as 0 | 1), x: fighter.x, z: fighter.z, facing: fighter.facing })),
+        CAMERA,
+      );
+      const t2 = performance.now();
+      const hud = overlay.current!;
+      if (hud.width !== canvas.current!.width || hud.height !== canvas.current!.height) {
+        hud.width = canvas.current!.width;
+        hud.height = canvas.current!.height;
+      }
+      const ctx = hud.getContext('2d')!;
+      times.engine = times.engine * 0.9 + (t1 - t0) * 0.1;
+      times.pose = times.pose * 0.9 + (t2 - t1) * 0.1;
+      times.draw = times.draw * 0.9 + (performance.now() - t2) * 0.1;
+      drawHud(ctx, hud.width, hud.height, current, names, (point) => ring.project(CAMERA, point), debugRef.current ? `engine ${times.engine.toFixed(2)} ms · pose+draw ${times.pose.toFixed(2)} ms · hud ${times.draw.toFixed(2)} ms` : undefined);
+    };
+    frame = requestAnimationFrame(loop);
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.code === 'F3') {
+        event.preventDefault();
+        setDebug((d) => !d);
+      } else if (event.code === 'Escape') {
+        onBack();
+      } else if (event.code === 'Enter' && match.current?.phase === 'matchEnd') {
+        rematch.current++;
+        match.current = newMatch([fighters[0].moves, fighters[1].moves], seed + rematch.current, names);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      cancelAnimationFrame(frame);
+      input.detach();
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [fighters, stage, p2, onBack]);
+
+  return (
+    <div class="screen fight" ref={stageElement} tabIndex={0}>
+      <canvas class="ring" ref={canvas} />
+      <canvas class="hud" ref={overlay} />
+    </div>
+  );
+}

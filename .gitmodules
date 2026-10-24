@@ -1,0 +1,3 @@
+[submodule "vendor/mogshot"]
+	path = vendor/mogshot
+	url = https://github.com/realworldbuilder/mogshot.git

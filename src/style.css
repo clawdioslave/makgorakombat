@@ -1,0 +1,571 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b0708;
+  --stone: #1a1012;
+  --stone-light: #2a1a1c;
+  --line: #4a2a24;
+  --text: #f4f1e6;
+  --dim: #b5a79a;
+  --gold: #ffd100;
+  --gold-dark: #b8860b;
+  --blood: #c8121c;
+  --ember: #ff5a2a;
+  --alliance: #2457b5;
+  --horde: #a8141d;
+  --p1: #ff3b3b;
+  --p2: #3b8bff;
+  --serif: 'Cinzel', Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+  --heavy: 'Metal Mania', Impact, 'Arial Black', sans-serif;
+  font: 16px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+main {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: radial-gradient(ellipse at 50% 30%, #2b1416 0%, var(--bg) 60%, #000 100%);
+  color: var(--text);
+  overflow: hidden;
+}
+
+a {
+  color: var(--gold);
+}
+
+.dim {
+  color: var(--dim);
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.bad {
+  color: var(--ember);
+}
+
+code {
+  color: var(--gold);
+}
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  outline: none;
+}
+
+/* ---- the logo -------------------------------------------------------------------------- */
+
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35em;
+  user-select: none;
+  line-height: 1;
+}
+
+.logo .makgora {
+  font-family: var(--serif);
+  font-weight: 900;
+  font-size: 4.4rem;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  text-shadow:
+    0 0 2px #000,
+    0 3px 0 var(--gold-dark),
+    0 6px 18px rgba(0, 0, 0, 0.8);
+}
+
+.logo .kombat {
+  font-family: var(--heavy);
+  font-size: 5.2rem;
+  letter-spacing: 0.02em;
+  color: var(--blood);
+  text-shadow:
+    0 0 2px #000,
+    0 3px 0 #4a0608,
+    0 6px 22px rgba(200, 18, 28, 0.6);
+}
+
+.logo.small .makgora {
+  font-size: 1.6rem;
+}
+
+.logo.small .kombat {
+  font-size: 1.9rem;
+}
+
+/* ---- the title ------------------------------------------------------------------------- */
+
+.title {
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+}
+
+.tagline {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  color: var(--text);
+  opacity: 0.85;
+}
+
+.drop {
+  width: min(640px, 92vw);
+  padding: 34px 28px;
+  border: 2px dashed var(--line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.45);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.drop.over {
+  border-color: var(--gold);
+  background: rgba(255, 209, 0, 0.08);
+}
+
+.drop p {
+  margin: 0 0 12px;
+}
+
+.drop .big {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+}
+
+.drop.opening .big {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.button {
+  display: inline-block;
+  padding: 8px 18px;
+  border: 1px solid var(--gold-dark);
+  border-radius: 6px;
+  color: var(--gold);
+  cursor: pointer;
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.button:hover {
+  background: rgba(255, 209, 0, 0.1);
+}
+
+.credits {
+  max-width: 560px;
+}
+
+/* ---- choose your champion ------------------------------------------------------------- */
+
+.select {
+  padding: 10px 16px 8px;
+  gap: 6px;
+}
+
+.select header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.select h1 {
+  margin: 0;
+  font-family: var(--heavy);
+  font-weight: 400;
+  font-size: 2.6rem;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+  text-shadow: 0 3px 0 var(--gold-dark), 0 6px 16px rgba(0, 0, 0, 0.8);
+}
+
+.sides {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr minmax(420px, 760px) 1fr;
+  gap: 12px;
+  width: 100%;
+  min-height: 0;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.preview {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: block;
+}
+
+.plate {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.75));
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--p1);
+  position: relative;
+  overflow: hidden;
+}
+
+.plate.p2 {
+  border-left: 1px solid var(--line);
+  border-right: 6px solid var(--p2);
+  text-align: right;
+}
+
+.plate .who {
+  font-size: 0.75rem;
+  letter-spacing: 0.3em;
+  color: var(--dim);
+}
+
+.plate .name {
+  font-family: var(--heavy);
+  font-size: 2.2rem;
+  line-height: 1.05;
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
+
+.plate .title {
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plate.p2 .title {
+  justify-content: flex-end;
+}
+
+.plate img.class,
+.tile .name img.class {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--gold-dark);
+}
+
+.plate .status {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--dim);
+}
+
+.plate .stamp {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  padding: 4px 10px;
+  border: 2px solid var(--gold);
+  color: var(--gold);
+  font-family: var(--serif);
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  font-size: 0.8rem;
+  transform: rotate(-8deg);
+  animation: slam 0.25s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.plate.p2 .stamp {
+  right: auto;
+  left: 12px;
+  transform: rotate(8deg);
+}
+
+.plate.locked {
+  animation: flash 0.4s ease-out;
+}
+
+@keyframes slam {
+  from {
+    transform: scale(2.4) rotate(-8deg);
+    opacity: 0;
+  }
+}
+
+@keyframes flash {
+  from {
+    background: rgba(200, 18, 28, 0.6);
+  }
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px;
+}
+
+.grid .label {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.3em;
+  color: var(--dim);
+  margin: 6px 0 2px;
+}
+
+.tiles {
+  display: grid;
+  gap: 5px;
+}
+
+.tiles.champions {
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+}
+
+.tile {
+  position: relative;
+  aspect-ratio: 1;
+  border: 2px solid var(--line);
+  border-radius: 6px;
+  background: var(--stone);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.08s;
+}
+
+.tile.alliance {
+  border-color: #2a3f6b;
+}
+
+.tile.horde {
+  border-color: #6b1a1f;
+}
+
+.tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: saturate(0.8) brightness(0.85);
+}
+
+.tile.p1 img,
+.tile.p2 img {
+  filter: none;
+}
+
+.tile .random {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-family: var(--heavy);
+  font-size: 2.6rem;
+  color: var(--gold);
+}
+
+.tile .name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 2px 4px;
+  background: rgba(0, 0, 0, 0.7);
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tile .name img.class {
+  width: 16px;
+  height: 16px;
+}
+
+.tile.p1 {
+  transform: scale(1.06);
+  z-index: 2;
+  box-shadow: 0 0 0 3px var(--p1), 0 0 18px rgba(255, 59, 59, 0.7);
+}
+
+.tile.p2 {
+  transform: scale(1.06);
+  z-index: 2;
+  box-shadow: 0 0 0 3px var(--p2), 0 0 18px rgba(59, 139, 255, 0.7);
+}
+
+.tile.p1.p2 {
+  box-shadow: 0 0 0 3px var(--p1), 0 0 0 6px var(--p2), 0 0 18px rgba(255, 255, 255, 0.5);
+}
+
+.tile.locked1::after,
+.tile.locked2::after {
+  content: '✓';
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-weight: 900;
+  color: var(--p1);
+  text-shadow: 0 0 4px #000;
+}
+
+.tile.locked2::after {
+  left: auto;
+  right: 4px;
+  color: var(--p2);
+}
+
+.controls {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 0.78rem;
+  color: var(--dim);
+  letter-spacing: 0.04em;
+}
+
+.controls b {
+  color: var(--gold);
+}
+
+/* ---- versus and the fight ------------------------------------------------------------- */
+
+.ring,
+.hud {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hud {
+  pointer-events: none;
+}
+
+.versus .plates {
+  position: absolute;
+  top: 7vh;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 24px;
+  padding: 0 5vw;
+  pointer-events: none;
+}
+
+.versus .plate {
+  background: none;
+  border: none;
+}
+
+.versus .plate.p1 {
+  border-left: 8px solid var(--p1);
+}
+
+.versus .plate.p2 {
+  border-right: 8px solid var(--p2);
+}
+
+.versus .plate .name {
+  font-size: 3.4rem;
+  text-shadow: 0 4px 0 #000, 0 8px 24px rgba(0, 0, 0, 0.9);
+}
+
+.versus .vs {
+  font-family: var(--heavy);
+  font-size: 7rem;
+  color: var(--blood);
+  text-shadow: 0 0 2px #000, 0 4px 0 #4a0608, 0 10px 30px rgba(200, 18, 28, 0.7);
+  animation: slam 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.versus .stages {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 16px 12px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.85) 40%);
+  text-align: center;
+}
+
+.versus .stages .label {
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  font-size: 0.85rem;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+
+.versus .strip {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  height: 84px;
+}
+
+.versus .stage {
+  width: 128px;
+  height: 72px;
+  border: 2px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--stone);
+  display: grid;
+  place-items: center;
+  flex: none;
+  transition: transform 0.1s;
+}
+
+.versus .stage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.versus .stage.here {
+  transform: scale(1.18);
+  border-color: var(--gold);
+  box-shadow: 0 0 18px rgba(255, 209, 0, 0.6);
+}
+
+.versus .controls {
+  margin-top: 10px;
+}
