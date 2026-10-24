@@ -122,7 +122,7 @@ function candidates(wielding: Wielding, shield: boolean): Record<MoveName, { nam
     swing: { names: uniq(ATTACK[wielding], ['AttackUnarmed']), loop: false, hit: SWING_HIT },
     dodge: { names: ['Dodge', 'Walkbackwards'], loop: false },
     parry: { names: uniq(shield ? ['ShieldBlock'] : [], [...PARRY[wielding], 'Parry1H', 'Parry2H', 'ParryUnarmed', 'ShieldBlock', 'Dodge']), loop: false },
-    cast: { names: ['ReadySpellDirected', 'ChannelCastDirected', 'ReadySpellOmni', 'SpellCastDirected'], loop: true },
+    cast: { names: ['ChannelCastDirected', 'ReadySpellDirected', 'ReadySpellOmni', 'SpellCastDirected'], loop: true },
     hit: { names: ['CombatWound', 'StandWound'], loop: false },
     crit: { names: ['CombatCritical', 'CombatWound'], loop: false },
     knockdown: { names: ['Knockdown', 'CombatCritical'], loop: false },

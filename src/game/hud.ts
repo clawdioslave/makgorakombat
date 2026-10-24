@@ -162,7 +162,18 @@ function sparks(ctx: CanvasRenderingContext2D, match: Match, at: (p: readonly [n
     if (!p) continue;
     const [sx, sy] = p;
     const life = Math.max(0, 1 - spark.t / Math.max(1, spark.life));
-    const colour = { hit: '255, 220, 90', crit: '255, 120, 40', block: '140, 200, 255', parry: '230, 230, 240', spell: '190, 120, 255' }[spark.kind];
+    const colour = { hit: '255, 220, 90', crit: '255, 120, 40', block: '140, 200, 255', parry: '230, 230, 240', spell: '190, 120, 255', dot: '170, 90, 255' }[spark.kind];
+    if (spark.kind === 'dot') {
+      // A dot's tick: motes drifting up off the body.
+      ctx.fillStyle = `rgba(${colour}, ${life})`;
+      for (let m = 0; m < 5; m++) {
+        const angle = m * 1.3 + spark.t * 0.05;
+        ctx.beginPath();
+        ctx.arc(sx + Math.cos(angle) * (10 + m * 4), sy - spark.t * 2.5 + Math.sin(angle) * 6, 3 * life + 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      continue;
+    }
     ctx.strokeStyle = `rgba(${colour}, ${life})`;
     ctx.lineWidth = (spark.kind === 'crit' ? 5 : 3.5) * life + 1;
     const rays = spark.kind === 'block' || spark.kind === 'parry' ? 6 : spark.kind === 'crit' ? 14 : 10;

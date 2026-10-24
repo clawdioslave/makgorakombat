@@ -53,7 +53,7 @@ describe('resolveMoves', () => {
     expect(table.moves.dazed.loop).toBe(true);
     expect(table.moves.walk.loop).toBe(true);
     expect(table.moves.cast.loop).toBe(true);
-    expect(table.moves.cast.animation).toBe('ReadySpellDirected');
+    expect(table.moves.cast.animation).toBe('ReadySpellDirected'); // the fake set has no ChannelCastDirected
     expect(table.moves.parry.loop).toBe(false);
   });
 
@@ -126,7 +126,7 @@ describe('resolveKit', () => {
     expect(mage.resource).toBe('mana');
     expect(mage.abilities[0].cast).toBe(90);
     expect(mage.abilities[0].move.animation).toBe('MagSpellCastBothFront');
-    expect(mage.abilities[0].hold.animation).toBe('ReadySpellDirected');
+    expect(mage.abilities[0].hold.animation).toBe('ReadySpellDirected'); // ChannelCastDirected first when the model has it
     expect(mage.abilities[0].hold.loop).toBe(true);
     for (const id of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]) {
       const kit = fakeTable(FULL_SET, 'oneHand', {}, id).kit;

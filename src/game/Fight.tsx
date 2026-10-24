@@ -27,7 +27,7 @@ interface FightProps {
 const MAX_STEPS = 4;
 
 /** How hard the camera shakes for each kind of landed blow, in pan units (a fraction of half the view's height). */
-const SHAKE: Record<Spark['kind'], number> = { hit: 0.025, crit: 0.06, spell: 0.03, block: 0.012, parry: 0.015 };
+const SHAKE: Record<Spark['kind'], number> = { hit: 0.025, crit: 0.06, spell: 0.03, block: 0.012, parry: 0.015, dot: 0 };
 const SHAKE_DECAY = 0.82;
 
 /** The camera's shake: kicked by each new spark, dying away over a few frames, deterministic in the frame count. */
@@ -91,9 +91,10 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
     void mixer.load(0, fighters[0].sounds);
     void mixer.load(1, fighters[1].sounds);
     // For scripts and the console: the live match and what the fight sounds like.
-    (window as unknown as { mk?: { match: () => Match; view: (i: 0 | 1) => FighterView; sounds: () => unknown } }).mk = {
+    (window as unknown as { mk?: { match: () => Match; view: (i: 0 | 1) => FighterView; fighters: () => [BuiltFighter, BuiltFighter]; sounds: () => unknown } }).mk = {
       match: () => match.current!,
       view: (i) => fighterView(match.current!, i),
+      fighters: () => fighters,
       sounds: () => ({ played: mixer.played, sides: mixer.summary() }),
     };
     const input = new InputReader();

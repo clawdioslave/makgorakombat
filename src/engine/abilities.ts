@@ -127,7 +127,8 @@ function ability(spec: Spec): Ability {
   return out;
 }
 
-const CAST_HOLD = ['ReadySpellDirected', 'ChannelCastDirected', 'ReadySpellOmni', 'SpellCastDirected'];
+/** Held while the cast bar fills: the channel pose moves the arms, so a caster is seen to be casting. */
+const CAST_HOLD = ['ChannelCastDirected', 'ReadySpellDirected', 'ReadySpellOmni', 'SpellCastDirected'];
 const SPELL = ['SpellCastDirected', 'ReadySpellDirected'];
 const OMNI = ['SpellCastOmni', 'SpellCastDirected'];
 const STRIKE_1H = ['CombatAbility1H01', 'CombatAbility1H02', 'Special1H', 'Attack1H', 'AttackUnarmed'];

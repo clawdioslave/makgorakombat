@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DOT_TICK_FRAMES, GCD_FRAMES } from '../../src/engine/abilities';
 import { BRAND } from '../../src/engine/brand';
+import { cpuInputs } from '../../src/engine/cpu';
 import { type Inputs, type Match, newMatch, poseOf, tick } from '../../src/engine/engine';
 import { BODY, FINISH_FRAMES, HALF, HP, INTRO_FRAMES, KO_SLOWMO, ROUND_END_FRAMES, START_X } from '../../src/engine/stage';
 import { fakeMatch, fakeTable, FULL_SET, HUNTER, inputs, MAGE, NONE, PALADIN, place, PRIEST, rig, ROGUE, run, SHAMAN, skipIntro, until, WARLOCK, WARRIOR } from './fake';
@@ -180,6 +181,31 @@ describe('the auto-attack', () => {
       if (match.fighters[0].move === 'swing') seen.add(poseOf(match, 0).sequence);
     }
     expect(seen.size).toBe(3);
+  });
+
+  it("fighter 2's landed swing is posed with its attack sequence, for the keyboard and the CPU alike", () => {
+    for (const cpu of [false, true]) {
+      const match = fighting(1.5);
+      const swingSeqs = new Set(match.tables[1].moves.swing.variations.map((v) => v.sequence));
+      const idleSeq = match.tables[1].moves.idle.variations[0]!.sequence;
+      let posedAttack = 0;
+      let landedWhilePosed = false;
+      for (let f = 0; f < 200; f++) {
+        rig(match, 'hit');
+        const p2 = cpu ? { ...cpuInputs(match, 1), left: false, right: false, jump: false } : inputs({ attack: true });
+        tick(match, [inputs(), p2]);
+        const posed = poseOf(match, 1).sequence;
+        if (match.fighters[1].state === 'attack') {
+          expect(swingSeqs.has(posed)).toBe(true);
+          expect(posed).not.toBe(idleSeq);
+          posedAttack++;
+          if (match.texts.some((t) => t.t === 1 && t.side === 0 && t.kind === 'damage')) landedWhilePosed = true;
+        }
+      }
+      expect(posedAttack).toBeGreaterThan(10);
+      expect(landedWhilePosed).toBe(true);
+      expect(match.fighters[0].hp).toBeLessThan(HP);
+    }
   });
 
   it('a bow shoots instead: the shot flies and lands for 9', () => {
@@ -484,6 +510,7 @@ describe('abilities', () => {
     run(match, DOT_TICK_FRAMES);
     expect(match.fighters[1].hp).toBe(HP - 5);
     expect(texts(match, 1)).toContain('dot:5');
+    expect(match.sparks.some((s) => s.kind === 'dot')).toBe(true);
     run(match, DOT_TICK_FRAMES * 4);
     expect(match.fighters[1].hp).toBe(HP - 25);
     expect(match.fighters[1].dots.length).toBe(0);

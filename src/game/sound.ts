@@ -230,6 +230,7 @@ export class Mixer {
     // Any spark left is a weapon landing: the attacker's weapon on the other's body. A parry rings
     // like a block; a spell that lands without flying sounds like its impact.
     for (const spark of sparks) {
+      if (spark.kind === 'dot') continue;
       const attacker = this.attacker(match);
       if (spark.kind === 'spell') {
         this.play(attacker, 'cast', spark.x);

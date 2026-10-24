@@ -134,7 +134,7 @@ export interface Projectile {
   damage: number;
 }
 
-export type SparkKind = 'hit' | 'block' | 'crit' | 'parry' | 'spell';
+export type SparkKind = 'hit' | 'block' | 'crit' | 'parry' | 'spell' | 'dot';
 
 export interface Spark {
   x: number;
@@ -740,6 +740,7 @@ function timers(match: Match, i: 0 | 1): void {
     dot.ticksLeft--;
     if (f.hp > 0) {
       damage(match, dot.source, i, dot.damage, 'dot');
+      spark(match, f.x, 1.4 + f.z, 'dot');
     }
     if (dot.ticksLeft <= 0) f.dots.splice(k, 1);
   }
