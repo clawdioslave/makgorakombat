@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { cpuInputs } from '../engine/cpu';
 import { type Inputs, type Match, newMatch, poseOf, tick } from '../engine/engine';
 import { InputReader } from '../engine/input';
+import { type MoveTable, resolveMoves } from '../engine/moves';
 import { CAMERA, TICK_MS } from '../engine/stage';
 import { Arena } from './arena';
 import type { BuiltFighter } from './fighters';
@@ -25,6 +26,19 @@ interface FightProps {
 
 const MAX_STEPS = 4;
 
+/** Classes whose off-hand, beside a one-hander, is a shield: warrior, paladin, shaman. */
+const SHIELD_CLASSES = new Set([1, 2, 7]);
+
+/**
+ * The fighter's moves and class kit, from its animations, its weapon and its class. A legend
+ * without a class gets a warrior's kit, or a hunter's behind a bow.
+ */
+function tableOf(fighter: BuiltFighter): MoveTable {
+  const { champion, result } = fighter;
+  const shield = result.wielding === 'oneHand' && champion.classId !== undefined && SHIELD_CLASSES.has(champion.classId) && champion.gear.some(([slot]) => slot === 'offHand');
+  return resolveMoves(result.scene.animations, result.wielding, champion.classId, shield);
+}
+
 export function Fight({ fighters, stage, p2, onBack }: FightProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
@@ -44,7 +58,8 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
     ring.setGround(stage);
     const names: [string, string] = [fighters[0].champion.name, fighters[1].champion.name];
     const seed = seedOf(fighters[0].champion.key + fighters[1].champion.key) + rematch.current;
-    match.current = newMatch([fighters[0].moves, fighters[1].moves], seed, names);
+    const tables: [MoveTable, MoveTable] = [tableOf(fighters[0]), tableOf(fighters[1])];
+    match.current = newMatch(tables, seed, names);
     const mixer = new Mixer();
     void mixer.load(0, fighters[0].sounds);
     void mixer.load(1, fighters[1].sounds);
@@ -111,7 +126,7 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
         onBack();
       } else if (event.code === 'Enter' && match.current?.phase === 'matchEnd') {
         rematch.current++;
-        match.current = newMatch([fighters[0].moves, fighters[1].moves], seed + rematch.current, names);
+        match.current = newMatch(tables, seed + rematch.current, names);
       }
     };
     window.addEventListener('keydown', onKey);

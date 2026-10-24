@@ -227,41 +227,65 @@ export class Mixer {
     }
     this.lastProjectiles = [...match.projectiles];
 
-    // Any spark left is a weapon landing: the attacker's weapon on the other's body.
+    // Any spark left is a weapon landing: the attacker's weapon on the other's body. A parry rings
+    // like a block; a spell that lands without flying sounds like its impact.
     for (const spark of sparks) {
       const attacker = this.attacker(match);
-      this.play(attacker, spark.kind === 'block' ? 'block' : spark.kind === 'crit' ? 'crit' : 'hit', spark.x);
+      if (spark.kind === 'spell') {
+        this.play(attacker, 'cast', spark.x);
+        this.play(attacker, 'impact', spark.x, 0.05);
+        continue;
+      }
+      this.play(attacker, spark.kind === 'block' || spark.kind === 'parry' ? 'block' : spark.kind === 'crit' ? 'crit' : 'hit', spark.x);
     }
   }
 
-  /** Who is swinging right now: the fighter in an attack that has connected; else the one not being hit. */
+  /** Who is swinging right now: the fighter in a swing or ability that has connected; else the one not being hit. */
   private attacker(match: Match, fallback: 0 | 1 = 0): 0 | 1 {
     const [a, b] = match.fighters;
-    if (a.state === 'attack' && a.hitDone && !(b.state === 'attack' && b.hitDone)) return 0;
-    if (b.state === 'attack' && b.hitDone && !(a.state === 'attack' && a.hitDone)) return 1;
-    if (a.state === 'attack' && b.state !== 'attack') return 0;
-    if (b.state === 'attack' && a.state !== 'attack') return 1;
-    if (a.state === 'hit' || a.state === 'knockdown' || a.state === 'death' || a.state === 'dazed') return 1;
-    if (b.state === 'hit' || b.state === 'knockdown' || b.state === 'death' || b.state === 'dazed') return 0;
+    const swinging = (f: Fighter) => f.state === 'attack' || f.state === 'ability';
+    if (swinging(a) && a.hitDone && !(swinging(b) && b.hitDone)) return 0;
+    if (swinging(b) && b.hitDone && !(swinging(a) && a.hitDone)) return 1;
+    if (swinging(a) && !swinging(b)) return 0;
+    if (swinging(b) && !swinging(a)) return 1;
+    if (a.state === 'hit' || a.state === 'knockdown' || a.state === 'death' || a.state === 'dazed' || a.state === 'stun' || a.state === 'dodge' || a.state === 'parry') return 1;
+    if (b.state === 'hit' || b.state === 'knockdown' || b.state === 'death' || b.state === 'dazed' || b.state === 'stun' || b.state === 'dodge' || b.state === 'parry') return 0;
     return fallback;
   }
 
   private onMove(match: Match, i: 0 | 1, f: Fighter): void {
     switch (f.state) {
       case 'attack':
-        if (f.move === 'light') {
-          this.play(i, 'swing', f.x, 0.08);
-          if (Math.random() < 0.5) this.play(i, 'exert', f.x);
-        } else if (f.move === 'heavy') {
+        // The auto-attack: a swing, or a shot's release.
+        this.play(i, 'swing', f.x, 0.08);
+        if (Math.random() < 0.4) this.play(i, 'exert', f.x);
+        return;
+      case 'ability': {
+        const ability = match.tables[i].kit.abilities[f.ability];
+        if (!ability) return;
+        if (ability.kind === 'melee' || ability.kind === 'rush' || ability.kind === 'charge') {
           this.play(i, 'swingCrit', f.x, 0.1);
           this.play(i, 'exertCrit', f.x);
-        } else if (f.move === 'special') {
-          // The cast itself sounds when the projectile leaves the hand.
+        } else if (ability.kind === 'bolt') {
+          // The cast itself sounds when the bolt leaves the hand.
           this.play(i, 'exert', f.x);
+        } else if (ability.kind === 'self' || ability.kind === 'blink' || ability.kind === 'leap') {
+          this.play(i, 'exert', f.x, 0, 0.6);
         }
+        return;
+      }
+      case 'cast':
+      case 'dash':
+        this.play(i, 'exert', f.x, 0, 0.7);
+        return;
+      case 'dodge':
+        this.play(i, 'exert', f.x, 0, 0.5);
         return;
       case 'hit':
         this.play(i, f.move === 'crit' ? 'injuryCrit' : 'injury', f.x, 0.03);
+        return;
+      case 'stun':
+        this.play(i, 'injuryCrit', f.x, 0.03);
         return;
       case 'knockdown':
         this.play(i, 'injuryCrit', f.x, 0.03);
