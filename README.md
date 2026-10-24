@@ -105,7 +105,7 @@ A camera `pitch` of 80 and a `zoom` of 40 gives a map of the hundred yards aroun
 
 ### Legends
 
-A legend is a creature display id in `src/game/roster.ts` (`LEGENDS`), built through the worker's `fighter` request with `npc` set, with a `classId` for the kit it fights with (Tyrande a priest, Thrall and Vol'jin shamans, Sylvanas a hunter, Malfurion a druid, Illidan a demon hunter, Varian and Cairne warriors) and its signature weapon by item id; when the open install lacks that item, the legend takes its class set's weapon rather than fight bare-handed. Only a display drawn on a player model works: the newer looks of most of these characters (Jaina since Mists, retail's Sylvanas and Anduin, the Lich King, Garrosh, Velen, Grommash) are unique models, which is why they are listed with a note and get no tile. Each legend lists its retail look first and its classic one after it; the game uses the first one the open folder has, so the row is shorter on the classic beta.
+A legend is a creature display id in `src/game/roster.ts` (`LEGENDS`), built through the worker's `fighter` request with `npc` set, with a `classId` for the kit it fights with (Tyrande a priest, Thrall and Vol'jin shamans, Sylvanas a hunter, Malfurion a druid, Illidan a demon hunter, Varian and Cairne warriors) and its weapons as kits in order of preference: retail's artifact first (the Doomhammer, G'Hanir, the Warglaives of Azzinoth, Felscorned Shalamayne), then the NPC weapon the classic files name (Monster - Mace, Thrall's Hammer; the Moonglaive; Cairne's Totem; Vol'jin's glaive). The first kit the open install has is worn; with none, the legend takes its class set's weapon rather than fight bare-handed. The move table follows the weapon, so a two-hander stands and swings as one and a bow shoots ([docs/legends-armed.png](docs/legends-armed.png)). Only a display drawn on a player model works: the newer looks of most of these characters (Jaina since Mists, retail's Sylvanas and Anduin, the Lich King, Garrosh, Velen, Grommash) are unique models, which is why they are listed with a note and get no tile. Each legend lists its retail look first and its classic one after it; the game uses the first one the open folder has, so the row is shorter on the classic beta.
 
 To check or add one, with Mogshot's command line pointed at an install (`--wow`, `--product`):
 
@@ -115,6 +115,10 @@ pnpm mogshot render spec.json     # {"npc": 19015} draws it; a look with a model
 ```
 
 The portraits in `public/legends/<slug>.png` are face crops rendered once with the same command (`"camera": {"zoom": 0.3, "panY": -2}` or so, tuned by eye for each model's height), since the browser has no portrait atlas for NPCs.
+
+### Spells
+
+Each ability's look is read from the game too. The worker's `spellVisuals` request walks SpellXSpellVisual, SpellVisualMissile, SpellVisualEvent, SpellVisualKitEffect and SpellVisualKitModelAttach to the models a spell draws: the missile, what glows in the hands while the bar fills, the release, the impact and the aura. `spellModels` builds them as small scenes, merged into the ring beside the fighters and posed each frame on the projectile, the hands or the target (`src/game/fx.ts`). The renderer draws meshes but not particles or ribbons, so a spell made only of particles has no model; over the models, `src/game/fx2d.ts` draws every legend's spell in light, timed off the engine's spell events: forked lightning by midpoint displacement, a moonbeam, a gold bubble, arrows with streaks, fel fire, slash crescents, dust and smoke. On the classic beta Lightning Bolt (its ball and the crackle in the hands), Earth Shock, Stormstrike, Power Word: Shield's ring, Wrath, Moonfire's column, Rake and the hunter's arrow have models; retail's newer visuals are mostly particles. One sheet per legend in [docs/legend-fx-&lt;legend&gt;.png](docs/).
 
 ## A fan game
 
