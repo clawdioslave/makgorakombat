@@ -273,6 +273,13 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [players]);
 
+  /**
+   * The builder's problems that are files this install lacks. The rest (a texture the game data
+   * names but the game draws without, a piece drawn another way) the builder recovers from, and
+   * the plate says nothing of them; the full list stays in the status line's title.
+   */
+  const missingPieces = (problems: readonly string[]) => problems.filter((problem) => /is not installed|is not part of this build|^No painted body/.test(problem));
+
   const portraitOf = (tile: Tile, sex: number) => {
     if (tile.kind === 'random') return undefined;
     if (tile.kind === 'legend') return legendPortrait(tile.legend.slug);
@@ -334,9 +341,9 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
         {player.building && !player.built && <div class="status">{BRAND.summoning}</div>}
         {player.error && <div class="status bad">{player.error}</div>}
         {player.locked && <div class="stamp">{BRAND.chosen}</div>}
-        {player.built && player.built.result.scene.problems.length > 0 && (
+        {player.built && missingPieces(player.built.result.scene.problems).length > 0 && (
           <div class="status dim small" title={player.built.result.scene.problems.join('\n')}>
-            {player.built.result.scene.problems.length} piece(s) not in this install: {player.built.result.scene.problems[0]}
+            {missingPieces(player.built.result.scene.problems).length} piece(s) not in this install: {missingPieces(player.built.result.scene.problems)[0]}
           </div>
         )}
       </div>
