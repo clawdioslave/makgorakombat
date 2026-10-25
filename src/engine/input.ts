@@ -82,8 +82,30 @@ try {
   // No storage: the fighting-game keys.
 }
 
-/** Keys the screens handle themselves. */
-export const MENU_KEYS = { rematch: 'Enter', back: 'Escape', debug: 'F3', layout: 'KeyC' } as const;
+/** Keys the screens handle themselves. N on the roster opens CREATE YOUR CHAMPION. */
+export const MENU_KEYS = { rematch: 'Enter', back: 'Escape', debug: 'F3', layout: 'KeyC', create: 'KeyN' } as const;
+
+/** What a key does on the menus that both players steer: the roster, and the creator. */
+export type RosterAction = 'up' | 'down' | 'left' | 'right' | 'confirm' | 'back' | 'sex' | 'classPrev' | 'classNext';
+export type RosterKeys = Readonly<Record<string, RosterAction>>;
+
+const WASD_ROSTER: RosterKeys = { KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', KeyJ: 'confirm', KeyH: 'back', KeyU: 'sex', KeyK: 'classPrev', KeyL: 'classNext' };
+const ARROWS_ROSTER: RosterKeys = {
+  ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+  Numpad1: 'confirm', Comma: 'confirm', Numpad4: 'back', KeyM: 'back',
+  Numpad0: 'sex', ShiftRight: 'sex', Numpad2: 'classPrev', Period: 'classPrev', Numpad3: 'classNext', Slash: 'classNext',
+};
+/** The game's own keys on the roster: the arrows move, 1 or Enter chooses, Backspace goes back, 4 switches sex, 2 and 3 cycle the class. */
+const DIGITS_ROSTER: RosterKeys = {
+  ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+  Digit1: 'confirm', Enter: 'confirm', Backspace: 'back', Digit4: 'sex', Digit2: 'classPrev', Digit3: 'classNext',
+};
+
+/** The roster keys per player under each layout, matching the fight's. */
+export const ROSTER_KEYS: Readonly<Record<KeyLayout, readonly [RosterKeys, RosterKeys]>> = {
+  classic: [WASD_ROSTER, ARROWS_ROSTER],
+  wow: [DIGITS_ROSTER, WASD_ROSTER],
+};
 
 /** Short labels for the HUD's controls hint and action bar. */
 export const KEY_LABELS: Readonly<Record<string, string>> = {

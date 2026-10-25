@@ -1,5 +1,5 @@
 import type { ClassEntry } from '@mogshot/character/appearance';
-import type { ItemSetInfo, Slot } from '@mogshot/character/equipment';
+import type { ItemSetInfo, ItemSummary, Slot } from '@mogshot/character/equipment';
 import { posableRig, type PosableRig } from '@mogshot/model/posable';
 import type { FighterResult, FightSoundSet } from '@mogshot/worker/api';
 import type { DataClient } from '@mogshot/worker/client';
@@ -125,6 +125,11 @@ export class Fighters {
       this.sets.set(classId, sets);
     }
     return sets;
+  }
+
+  /** An outfit drawn at random from the items of at least `minQuality` (4 is epic), for the creator. */
+  randomOutfit(minQuality: number): Promise<[Slot, ItemSummary][]> {
+    return this.client.randomOutfit(minQuality);
   }
 
   /** The class's best set, with weapons to match, as item ids by slot. */
