@@ -28,7 +28,7 @@ const KEEP_HASHES = 16;
 
 /** Either end of the wire. Strings are the screens' messages, bytes the fight's frames. */
 export interface Channel {
-  send(data: Uint8Array | string): void;
+  send(data: Uint8Array<ArrayBuffer> | string): void;
   onMessage(listener: (data: Uint8Array | string) => void): () => void;
   onClose(listener: () => void): () => void;
 }
@@ -77,7 +77,7 @@ export interface Frame {
   hash: { tick: number; value: number } | undefined;
 }
 
-export function encodeFrame(frame: Frame): Uint8Array {
+export function encodeFrame(frame: Frame): Uint8Array<ArrayBuffer> {
   const n = frame.inputs.length;
   const bytes = new Uint8Array(11 + n + 1 + (frame.hash ? 6 : 0));
   const view = new DataView(bytes.buffer);
