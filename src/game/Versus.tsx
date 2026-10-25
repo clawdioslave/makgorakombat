@@ -6,6 +6,7 @@ import type { DataClient } from '@mogshot/worker/client';
 import type { PlaceScene } from '@mogshot/world/place';
 import { CAMERA, START_X } from '../engine/stage';
 import { Arena } from './arena';
+import { BATTLEGROUND, LEVEL, music, stageCue } from './music';
 import type { BuiltFighter } from './fighters';
 import { facingRadians, type Ground, type Stage, thumbnailUrl } from './stages';
 import { type Line, WowTooltip } from './ui/WowTooltip';
@@ -51,6 +52,9 @@ function stageLines(entry: Entry, status: string | undefined): Line[] {
 const STAGE_LIKE = /arena|gurubashi|nagrand|coliseum|colosseum|durotar|orgrimmar|stranglethorn|barrens|valley of trials|ring/i;
 /** How many raised places are kept while the strip is browsed; a place is a few hundred megabytes of world. */
 const KEEP_PLACES = 3;
+
+/** How long the cursor rests on a stage before its music comes in, so a quick pass along the strip does not read every zone's. */
+const MUSIC_REST = 450;
 
 const keyOf = (entry: Entry) => (entry.kind === 'stage' ? `stage:${entry.stage.slug}` : `screen:${entry.screen.id}`);
 
@@ -168,6 +172,14 @@ export function Versus({ client, fighters, stages, screens, onFight, onBack }: V
     return () => {
       stale = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cursor, stages, screens]);
+
+  // The music of the stage under the cursor, once the cursor rests a moment; a loading screen has the battlegrounds'.
+  useEffect(() => {
+    const entry = entries[cursor];
+    const wait = setTimeout(() => music.play(entry?.kind === 'stage' ? stageCue(entry.stage) : BATTLEGROUND, LEVEL.versus), MUSIC_REST);
+    return () => clearTimeout(wait);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursor, stages, screens]);
 

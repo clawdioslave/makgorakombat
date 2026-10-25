@@ -57,6 +57,17 @@ export function soundReady(): boolean {
   return context !== undefined;
 }
 
+/** The context and the master gain (under the mute), once a key has made them. */
+export function audioOut(): { context: AudioContext; master: GainNode } | undefined {
+  return context && master ? { context, master } : undefined;
+}
+
+/** Call `listener` when the audio context comes up: at once if it is up already. */
+export function whenAudio(listener: () => void): void {
+  if (context) listener();
+  else listeners.add(listener);
+}
+
 interface Decoded {
   kit: number;
   pitchVariation: [number, number];
