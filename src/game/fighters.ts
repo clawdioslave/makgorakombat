@@ -6,6 +6,7 @@ import type { DataClient } from '@mogshot/worker/client';
 import { ALL_MOVE_NAMES, type MoveTable, resolveMoves } from '../engine/moves';
 import { type FighterFx, loadFighterFx } from './fx';
 import type { Tile, WeaponKit } from './roster';
+import { savedChampion } from './saved';
 
 /*
  * From a tile on the roster to a fighter in the ring: who to build (race, sex, class, gear),
@@ -66,6 +67,7 @@ export class Fighters {
         npc: tile.displayId,
       };
     }
+    if (tile.kind === 'saved') return savedChampion(tile.saved, tile.race, this.classes);
     const className = (id: number | undefined) => this.classes.find((c) => c.id === id)?.name.toUpperCase() ?? '';
     if (tile.kind === 'record') {
       const imported = await this.client.resolveImport(tile.record);
@@ -114,11 +116,20 @@ export class Fighters {
     return [];
   }
 
+  /** The class's sets, as the worker lists them, read once per class. */
+  setsOf(classId: number): Promise<ItemSetInfo[]> {
+    let sets = this.sets.get(classId);
+    if (!sets) {
+      sets = this.client.sets(classId);
+      sets.catch(() => this.sets.delete(classId));
+      this.sets.set(classId, sets);
+    }
+    return sets;
+  }
+
   /** The class's best set, with weapons to match, as item ids by slot. */
   private async bestKit(classId: number): Promise<[Slot, number][]> {
-    let sets = this.sets.get(classId);
-    if (!sets) this.sets.set(classId, (sets = this.client.sets(classId)));
-    const list = await sets;
+    const list = await this.setsOf(classId);
     const best = list.reduce<ItemSetInfo | undefined>((top, set) => (top === undefined || set.level > top.level ? set : top), undefined);
     if (!best) return [];
     return [...best.pieces, ...best.weapons].map(([slot, item]) => [slot, item.id]);
@@ -176,6 +187,9 @@ export class Fighters {
       // Touched: it goes to the back of the line.
       this.built.delete(champion.key);
       this.built.set(champion.key, fighter);
+      // A made champion's key leaves out its name, so one renamed since the build is handed back under its new name.
+      const { name, title } = champion;
+      fighter = fighter.then((built) => (built.champion.name === name && built.champion.title === title ? built : { ...built, champion: { ...built.champion, name, title } }));
     }
     return fighter;
   }

@@ -1,12 +1,13 @@
 import type { ClassEntry, Race } from '@mogshot/character/appearance';
 import type { ImportedRecord } from '@mogshot/import/record';
 import type { CreatureLook } from '@mogshot/worker/api';
+import type { SavedChampion } from './saved';
 
 /*
  * The roster: every race the game lets you create, one tile each, in the character creation
  * screen's order with the Alliance first, then the neutral races, then the Horde; a random
- * tile; above them, the player's own characters as the Mogshot addon captured them; and
- * above those the legends: named Warcraft characters drawn as the game draws them.
+ * tile; above them, the champions the player made on CREATE YOUR CHAMPION and their own
+ * characters as the Mogshot addon captured them; and above those the legends: named Warcraft characters drawn as the game draws them.
  */
 
 export type Faction = 'alliance' | 'horde' | 'neutral';
@@ -45,6 +46,7 @@ export interface WeaponKit {
 export type Tile =
   | { kind: 'race'; id: string; race: Race }
   | { kind: 'record'; id: string; race: Race; record: ImportedRecord }
+  | { kind: 'saved'; id: string; race: Race; saved: SavedChampion }
   | { kind: 'legend'; id: string; legend: Legend; displayId: number; raceId: number; sex: number; race: Race | undefined }
   | { kind: 'random'; id: 'random' };
 
