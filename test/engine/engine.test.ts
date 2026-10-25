@@ -921,6 +921,9 @@ describe('the spell queue', () => {
     press(match, 0, 0);
     run(match, GCD_FRAMES);
     expect(f.cooldowns[1]).toBe(0);
+  });
+});
+
 describe('the finish window', () => {
   it('a cast the winner had in flight does not land as the plain finisher', () => {
     const match = fighting(1.5, 1, [PRIEST, WARRIOR]);

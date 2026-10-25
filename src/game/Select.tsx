@@ -57,8 +57,11 @@ interface Player {
 }
 
 const COLUMNS = 8;
-/** Only the legends on the select screen. */
-const LEGENDS_ONLY = true;
+/**
+ * Only the legends on the select screen (William, 24 Oct 2026), unless the page is opened with
+ * `?all` on the address, which brings back every race and the player's own characters.
+ */
+const LEGENDS_ONLY = !(typeof location !== 'undefined' && new URLSearchParams(location.search).has('all'));
 const HOVER_MS = 200;
 
 type RosterAction = 'up' | 'down' | 'left' | 'right' | 'confirm' | 'back' | 'sex' | 'classPrev' | 'classNext';
