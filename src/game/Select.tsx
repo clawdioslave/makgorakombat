@@ -462,15 +462,17 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
 
   return (
     <div class="screen select">
-      <header>
-        <LogoArt small />
-        <h1>{BRAND.choose}</h1>
-      </header>
       <div class="sides">
         <div class="side left">
           <Preview fighter={players[0].built} locked={players[0].locked} side="left" />
           {plate(0)}
         </div>
+        {/* The logo and the call head the middle column, so the champions on either side stand the full height of the screen. */}
+        <div class={`middle ${legendsOnly ? 'legends-only' : ''}`}>
+        <header>
+          <LogoArt small={!legendsOnly} />
+          <h1>{BRAND.choose}</h1>
+        </header>
         <div class={`grid ${legendsOnly ? 'legends-only' : ''}`}>
           {legends.length > 0 && (
             <>
@@ -494,6 +496,7 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
           </div>
           </>
           )}
+        </div>
         </div>
         <div class="side right">
           <Preview fighter={players[1].built} locked={players[1].locked} side="right" />

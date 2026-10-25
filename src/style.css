@@ -526,20 +526,57 @@ code {
   gap: 6px;
 }
 
+.select .middle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-height: 0;
+}
+
 .select header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 24px;
+  justify-content: center;
+  column-gap: 20px;
+  flex: none;
 }
 
 .select h1 {
   margin: 0;
   font-family: var(--heavy);
   font-weight: 400;
-  font-size: 2.6rem;
+  font-size: 1.9rem;
   letter-spacing: 0.08em;
   color: var(--gold);
   text-shadow: 0 3px 0 var(--gold-dark), 0 6px 16px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+
+/* Legends only: the grid is one short panel, so the logo stands large over it and the call sits under the logo. */
+.select .middle.legends-only {
+  justify-content: center;
+  gap: 14px;
+}
+
+.select .middle.legends-only header {
+  flex-direction: column;
+}
+
+.select .middle.legends-only .logo-art {
+  width: min(100%, 640px, 60vh);
+  margin: -1.5vh 0 -0.5vh;
+}
+
+/* On a short screen the tiles give a little width back so logo, call and both rows still fit. */
+.select .middle.legends-only .grid {
+  width: min(100%, 94vh);
+  align-self: center;
+}
+
+.select .middle.legends-only h1 {
+  font-size: clamp(1.6rem, min(3vw, 5vh), 3rem);
 }
 
 .sides {

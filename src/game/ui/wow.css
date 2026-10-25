@@ -254,7 +254,7 @@
     inset 0 0 0 1px #000,
     0 0 0 1px #000,
     0 0.4em 1.2em rgba(0, 0, 0, 0.6);
-  align-self: center;
+  align-self: stretch;
 }
 
 .select .grid .label {
