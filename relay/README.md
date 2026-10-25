@@ -73,3 +73,5 @@ must use the same relay.
 - `pnpm dev` serves it on `http://localhost:8787`.
 - `node scripts/probe.mjs [url] [rounds]` makes a room on a deployed relay, joins it twice and
   prints how long a ping to the room and an echo through it take.
+- `node scripts/lobby.mjs [url]` comes into a deployed relay's lobby as two players, has one
+  challenge the other, both go into the room they are given, then a decline and a quick match.
