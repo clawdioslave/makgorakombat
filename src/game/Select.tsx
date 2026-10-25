@@ -8,7 +8,7 @@ import { headshotOf, storedHeadshot } from './headshot';
 import { Preview } from './Preview';
 import { championTiles, classesOf, CREATE_TILE, cycleClass, factionOf, gridMove, randomTile, rosterTiles, sexFor, type Tile } from './roster';
 import { Create } from './Create';
-import { madeKey, type SavedChampion, savedTiles, withoutSaved, withSaved } from './saved';
+import { championRow, fullName, isBuiltin, madeKey, type SavedChampion, savedTiles, withoutSaved, withSaved } from './saved';
 import { LogoArt } from './Title';
 import { kitSpec, type ResourceKind } from '../engine/abilities';
 import { HP } from '../engine/stage';
@@ -21,8 +21,9 @@ const RESOURCE_WORDS: Record<ResourceKind, string> = { rage: 'Rage: builds in co
  * CHOOSE YOUR CHAMPION. Every race on a grid of the game's own portraits, the player's own
  * characters in a row above, the legends in a row above those, both players' cursors on it
  * at once, each champion drawn full size on its player's side as soon as the cursor rests
- * on it. After the last legend a question mark opens CREATE YOUR CHAMPION, and the champions
- * made there follow it, newest first.
+ * on it. After the last legend come the champions built into the game (Cassidy Darkstar), then
+ * a question mark that opens CREATE YOUR CHAMPION, and the champions made there follow it,
+ * newest first.
  */
 
 export type Source = 'keyboard' | 'gamepad' | 'cpu';
@@ -95,8 +96,9 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
   const roster = useMemo(() => rosterTiles(races), [races]);
   const [layout, setLayout] = useState<KeyLayout>(keyLayout());
   const champions = useMemo(() => championTiles(records, races), [records, races]);
-  // The legends' row: the legends, the question mark, and the champions made here, newest first.
-  const legendRow = useMemo(() => [...legends, CREATE_TILE, ...savedTiles([...saved].reverse(), races)], [legends, saved, races]);
+  // The legends' row: the legends, the built-in champions, the question mark, and the champions made here, newest first.
+  const legendRow = useMemo(() => championRow(legends, saved, races), [legends, saved, races]);
+  const createAt = legendRow.indexOf(CREATE_TILE);
   // The rows from the top, leaving out the empty ones; the cursor moves up and down through them.
   // For now the ring is for the legends only (William, 24 Oct 2026); the races and your own
   // characters come back by setting LEGENDS_ONLY to false. An install with no legend the game
@@ -122,7 +124,7 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
       return index >= 0 ? { ...player, cursor: { zone: 'legends', index } } : player;
     };
     const first = opening('tyrande', 1);
-    return [startOnCreate ? { ...first, cursor: { zone: 'legends', index: legends.length } } : first, opening('thrall', 0)];
+    return [startOnCreate ? { ...first, cursor: { zone: 'legends', index: createAt } } : first, opening('thrall', 0)];
   });
   const playersRef = useRef(players);
   playersRef.current = players;
@@ -294,10 +296,10 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
     const list = withSaved(saved, entry);
     onSaved(list);
     const at = savedTiles([...list].reverse(), races).findIndex((tile) => tile.id === `saved:${entry.id}`);
-    const index = legends.length + 1 + Math.max(0, at);
+    const index = createAt + 1 + Math.max(0, at);
     const other = making.who === 0 ? 1 : 0;
     // The other player's cursor stays on the champion it was on when the new tile pushes the row along.
-    if (isNew) update(other, (p) => (p.cursor.zone === 'legends' && p.cursor.index > legends.length ? { ...p, cursor: { ...p.cursor, index: p.cursor.index + 1 } } : p));
+    if (isNew) update(other, (p) => (p.cursor.zone === 'legends' && p.cursor.index > createAt ? { ...p, cursor: { ...p.cursor, index: p.cursor.index + 1 } } : p));
     update(making.who, (p) => ({ ...p, locked: false, cursor: { zone: 'legends', index } }));
     setMaking(undefined);
   };
@@ -305,7 +307,7 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
   const discard = (id: string) => {
     if (!making) return;
     onSaved(withoutSaved(saved, id));
-    update(making.who, (p) => ({ ...p, locked: false, cursor: { zone: 'legends', index: legends.length } }));
+    update(making.who, (p) => ({ ...p, locked: false, cursor: { zone: 'legends', index: createAt } }));
     setMaking(undefined);
   };
 
@@ -414,7 +416,7 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
     return portraits.races.get(`${tile.race.key}:${tile.kind === 'record' ? tile.record.sex : tile.kind === 'saved' ? tile.saved.sex : sexFor(tile.race, sex)}`);
   };
   const nameOf = (tile: Tile) =>
-    tile.kind === 'random' ? 'RANDOM' : tile.kind === 'create' ? 'CREATE' : tile.kind === 'record' ? tile.record.name : tile.kind === 'saved' ? tile.saved.name : tile.kind === 'legend' ? tile.legend.name : tile.race.name;
+    tile.kind === 'random' ? 'RANDOM' : tile.kind === 'create' ? 'CREATE' : tile.kind === 'record' ? tile.record.name : tile.kind === 'saved' ? fullName(tile.saved) : tile.kind === 'legend' ? tile.legend.name : tile.race.name;
 
   const tileView = (tile: Tile, zone: Cursor['zone'], index: number) => {
     const here = players.map((player) => player.cursor.zone === zone && player.cursor.index === index);
@@ -466,7 +468,8 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
                 {nameOf(tile)}
               </span>
             )}
-            {tile.kind === 'saved' && (
+            {/* A built-in champion is not the player's to change; N still opens the creator on it, which says so. */}
+            {tile.kind === 'saved' && !isBuiltin(tile.saved.id) && (
               <button
                 type="button"
                 class="edit"

@@ -1334,6 +1334,16 @@ code {
   text-align: center;
 }
 
+/* Opened on a champion that comes with the game: a word on why there is nothing to change. */
+.creator .built-in {
+  margin: 0 0 14px;
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--gold);
+  text-align: center;
+}
+
 /* The tile that opens the creator: a gold question mark on the legends' plate. */
 .tile.create {
   display: grid;
