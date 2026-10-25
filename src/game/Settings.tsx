@@ -1,12 +1,37 @@
 import { useEffect, useState } from 'preact/hooks';
 import { type InputAction, KEY_LABELS, KEY_LAYOUTS, type KeyLayout, keyLayout, LAYOUT_WORDS, setKeyLayout } from '../engine/input';
+import type { RulesName } from '../engine/rules';
 import { isMuted, setLevel, setMuted, soundSettings } from './sound';
 
 /*
- * Settings, from the title screen: the sound (mute, the music's level, the effects' level) and
- * which keys the two players hold. Everything is remembered in the browser; nothing here needs
- * the folder. The same panel as the guide, so it reads as one interface.
+ * Settings, from the title screen: the sound (mute, the music's level, the effects' level), which
+ * keys the two players hold, and the rules the fight is fought under. Everything is remembered in
+ * the browser; nothing here needs the folder. The same panel as the guide, so it reads as one interface.
  */
+
+const RULES_STORAGE = 'makgora.rules';
+/** KOMBAT until the player chooses otherwise. */
+let rules: RulesName = 'kombat';
+try {
+  const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(RULES_STORAGE) : null;
+  if (saved === 'warcraft' || saved === 'kombat') rules = saved;
+} catch {
+  // No storage: KOMBAT.
+}
+
+/** The rules the next fight is fought under, as last chosen. */
+export function chosenRules(): RulesName {
+  return rules;
+}
+
+export function chooseRules(next: RulesName): void {
+  rules = next;
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(RULES_STORAGE, next);
+  } catch {
+    // Storage may be blocked; the choice then lasts for this visit.
+  }
+}
 
 interface SettingsProps {
   onClose: () => void;
@@ -28,6 +53,7 @@ export function Settings({ onClose }: SettingsProps) {
   const [music, setMusic] = useState(soundSettings().music);
   const [effects, setEffects] = useState(soundSettings().effects);
   const [layout, setLayout] = useState<KeyLayout>(keyLayout());
+  const [ruleset, setRuleset] = useState<RulesName>(chosenRules());
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -48,6 +74,10 @@ export function Settings({ onClose }: SettingsProps) {
     setLayout(next);
   };
   const [p1, p2] = KEY_LAYOUTS[layout];
+  const pick = (next: RulesName) => {
+    chooseRules(next);
+    setRuleset(next);
+  };
 
   return (
     <div class="guide-backdrop" onClick={onClose}>
@@ -135,6 +165,21 @@ export function Settings({ onClose }: SettingsProps) {
           <p class="dim small">
             <b>C</b> on the roster switches the keys too · <b>Tab</b> there makes player 2 the keyboard, a gamepad or the computer · a gamepad plays with A B X,
             the right trigger and Y
+          </p>
+
+          <h3>Rules</h3>
+          <div class="choice" role="radiogroup" aria-label="Rules">
+            <button type="button" class={ruleset === 'warcraft' ? 'here' : ''} role="radio" aria-checked={ruleset === 'warcraft'} onClick={() => pick('warcraft')}>
+              <b>Warcraft</b>
+              <span>swing timers, the hit table, the global cooldown, as the game plays</span>
+            </button>
+            <button type="button" class={ruleset === 'kombat' ? 'here' : ''} role="radio" aria-checked={ruleset === 'kombat'} onClick={() => pick('kombat')}>
+              <b>Kombat</b>
+              <span>attacks on the press, combos, block, no dice</span>
+            </button>
+          </div>
+          <p class="dim small">
+            Under Kombat three presses in rhythm are a string, holding back blocks, a double tap forward or back dashes, and attack in the air is a jumping attack. The next fight takes the change.
           </p>
         </div>
       </div>

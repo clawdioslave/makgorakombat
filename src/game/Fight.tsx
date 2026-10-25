@@ -12,6 +12,7 @@ import { seedOf } from './pixels';
 import { LEVEL, music, stageCue } from './music';
 import { isMuted, Mixer, toggleMute } from './sound';
 import type { Source } from './Select';
+import { chosenRules } from './Settings';
 import type { Ground } from './stages';
 
 /*
@@ -111,7 +112,8 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
     const names: [string, string] = [fighters[0].champion.name, fighters[1].champion.name];
     const seed = seedOf(fighters[0].champion.key + fighters[1].champion.key) + rematch.current;
     const tables: [MoveTable, MoveTable] = [tableOf(fighters[0]), tableOf(fighters[1])];
-    match.current = newMatch(tables, seed, names);
+    const rules = chosenRules();
+    match.current = newMatch(tables, seed, names, rules);
     const mixer = new Mixer();
     void mixer.load(0, fighters[0].sounds);
     void mixer.load(1, fighters[1].sounds);
@@ -218,7 +220,7 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
         onBack();
       } else if (event.code === 'Enter' && match.current?.phase === 'matchEnd') {
         rematch.current++;
-        match.current = newMatch(tables, seed + rematch.current, names);
+        match.current = newMatch(tables, seed + rematch.current, names, rules);
       }
     };
     window.addEventListener('keydown', onKey);
