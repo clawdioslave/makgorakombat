@@ -28,6 +28,8 @@ export type FighterState =
   | 'cast'
   /** Charging or rushing at the target. */
   | 'dash'
+  /** KOMBAT's double tap: a run at the opponent, a hop back from them. */
+  | 'run' | 'backdash'
   | 'dodge' | 'parry'
   /** KOMBAT: a blow taken on the guard. */
   | 'block'
@@ -139,8 +141,20 @@ export interface Fighter {
   swings: number;
   /** Frames this fighter cannot act after a blow landed on them. */
   hitstun: number;
-  /** Frames this fighter cannot act after blocking a blow. */
+  /** Frames this fighter cannot act after blocking a blow or landing out of a jumping attack. */
   lag: number;
+  /** The double tap: frames the current direction has been held, and the direction just tapped and let go with the frames since. */
+  holdT: number;
+  tapDir: -1 | 0 | 1;
+  tapT: number;
+  /** A double tap waiting for the fighter to be free, kept a few frames; 0 for none. */
+  dashWant: -1 | 0 | 1;
+  dashWantT: number;
+  /** The run or backdash under way: which way along x and frames into it. */
+  dashDir: -1 | 1;
+  dashT: number;
+  /** This jump's attack has been thrown; the landing costs a few frames. */
+  airAttack: boolean;
 }
 
 export interface Projectile {
@@ -318,6 +332,8 @@ const ABILITY_RECOVER = 0.45;
 const DODGE_RECOVER = 0.4;
 /** Reach beyond the ability's range once it is already swinging. */
 const REACH_SLACK = 0.4;
+/** How far behind them a jumping attack still reaches a target passed under. */
+const AIR_UNDER = 0.5;
 const DASH_SPEED = 0.3;
 const DASH_STOP = 1.4;
 const DASH_LIMIT = 60;
@@ -391,6 +407,14 @@ function newFighter(side: 0 | 1, table: MoveTable): Fighter {
     swings: 0,
     hitstun: 0,
     lag: 0,
+    holdT: 0,
+    tapDir: 0,
+    tapT: 0,
+    dashWant: 0,
+    dashWantT: 0,
+    dashDir: 1,
+    dashT: 0,
+    airAttack: false,
   };
 }
 
@@ -509,6 +533,8 @@ export function actionable(match: Match, i: 0 | 1): boolean {
     case 'block':
       return true;
     case 'attack':
+      // A jumping attack holds the fighter until they land.
+      if (f.airAttack) return false;
       return f.t >= rulesOf(match).swingHit.recover * durationOf(match, i);
     case 'ability': {
       // A buff or a blink does not hold the fighter; a strike does, until it is half played.
@@ -722,9 +748,29 @@ const BUFFER_FRAMES = 8;
 function readKeys(match: Match, i: 0 | 1, inputs: Inputs): void {
   const f = match.fighters[i];
   const rules = rulesOf(match);
-  f.held = inputs.right === inputs.left ? 0 : inputs.right ? 1 : -1;
+  const dir: -1 | 0 | 1 = inputs.right === inputs.left ? 0 : inputs.right ? 1 : -1;
+  // KOMBAT's double tap: a direction tapped, let go and pressed again within the window dashes that way.
+  const dash = rules.dash;
+  if (dash) {
+    if (f.tapDir !== 0 && ++f.tapT > dash.window) f.tapDir = 0;
+    if (f.dashWantT > 0 && --f.dashWantT === 0) f.dashWant = 0;
+    if (dir !== f.held) {
+      if (dir !== 0 && dir === f.tapDir) {
+        f.dashWant = dir;
+        f.dashWantT = BUFFER_FRAMES;
+        f.tapDir = 0;
+      } else if (f.held !== 0 && f.holdT <= dash.tap) {
+        f.tapDir = f.held;
+        f.tapT = 0;
+      }
+      f.holdT = 0;
+    } else if (dir !== 0) {
+      f.holdT++;
+    }
+  }
+  f.held = dir;
   // A tap during a swing, or within a few frames of its end, continues KOMBAT's string.
-  if (f.state === 'attack') f.chainT = rules.chainGrace;
+  if (f.state === 'attack' && !f.airAttack) f.chainT = rules.chainGrace;
   else if (f.chainT > 0) f.chainT--;
   // The attack key: held keeps the auto-attack on; a tap queues one swing.
   const tap = inputs.attack && !f.attackWas;
@@ -774,7 +820,7 @@ function swingAt(match: Match, i: 0 | 1): void {
 function cancels(match: Match, i: 0 | 1): boolean {
   const f = match.fighters[i];
   const rules = rulesOf(match);
-  if (f.state !== 'attack' || match.phase !== 'fight' || actionable(match, i)) return false;
+  if (f.state !== 'attack' || f.airAttack || match.phase !== 'fight' || actionable(match, i)) return false;
   if (rules.cancel && f.buffered >= 0 && f.t >= rules.swingHit.from * durationOf(match, i)) {
     const n = f.buffered;
     if (!(abilityOf(match, i, n).gcd && f.gcd > 0)) {
@@ -790,6 +836,20 @@ function cancels(match: Match, i: 0 | 1): boolean {
   return false;
 }
 
+/** A frame of a run or a backdash. A run past its first few frames is cut short by a swing. */
+function dashStep(match: Match, i: 0 | 1): void {
+  const f = match.fighters[i];
+  const dash = rulesOf(match).dash!;
+  const run = f.state === 'run';
+  if (run && f.dashT >= dash.cancel && (f.queued || f.auto)) {
+    swingAt(match, i);
+    return;
+  }
+  f.dashT++;
+  f.x += f.dashDir * (run ? dash.speed : dash.backSpeed) * (f.slowT > 0 ? SLOW_FACTOR : 1);
+  if (f.dashT >= (run ? dash.frames : dash.backFrames)) play(f, 'idle', 'idle');
+}
+
 function applyInputs(match: Match, i: 0 | 1, inputs: Inputs): void {
   const f = match.fighters[i];
   const o = match.fighters[other(i)];
@@ -798,6 +858,18 @@ function applyInputs(match: Match, i: 0 | 1, inputs: Inputs): void {
   const dir = (inputs.right ? 1 : 0) - (inputs.left ? 1 : 0);
   // Moving or jumping cancels a cast.
   if (f.cast && f.state === 'cast' && (dir !== 0 || inputs.jump)) cancelCast(f);
+  if ((f.state === 'run' || f.state === 'backdash') && f.hitstun === 0) {
+    dashStep(match, i);
+    return;
+  }
+  // KOMBAT: a press in the air is a jumping attack, thrown from the top of the jump.
+  if (rules.airAttack && f.state === 'jump' && f.airborne && !f.airAttack && f.queued && match.phase === 'fight') {
+    if (f.vz > 0) return;
+    f.airAttack = true;
+    f.chainPress = false;
+    swingAt(match, i);
+    return;
+  }
   if (cancels(match, i)) return;
   if (!actionable(match, i)) return;
 
@@ -828,6 +900,17 @@ function applyInputs(match: Match, i: 0 | 1, inputs: Inputs): void {
       f.attackSaid = true;
       text(match, i, 'info', 'OUT OF RANGE');
     }
+  }
+  // KOMBAT's double tap: a run at the opponent, or a hop back from them.
+  if (f.dashWant !== 0 && rules.dash && !f.airborne && match.phase === 'fight') {
+    const forward = f.dashWant === (o.x >= f.x ? 1 : -1);
+    f.dashDir = f.dashWant;
+    f.dashWant = 0;
+    f.dashWantT = 0;
+    f.dashT = 0;
+    if (forward) play(f, 'run', 'walk');
+    else play(f, 'backdash', 'dodge');
+    return;
   }
   if (inputs.jump && !f.airborne) {
     play(f, 'jump', 'jumpStart');
@@ -864,6 +947,11 @@ function advanceMove(match: Match, i: 0 | 1): void {
   if (f.t < duration) return;
   if (move.loop) {
     f.t = duration > 0 ? f.t % duration : 0;
+    return;
+  }
+  // A jumping attack played out before the ground: back to the jump until landing.
+  if (f.state === 'attack' && f.airAttack && f.airborne) {
+    play(f, 'jump', 'jump');
     return;
   }
   switch (f.move) {
@@ -1125,6 +1213,8 @@ function strike(match: Match, ai: 0 | 1, ti: 0 | 1, blow: Blow, dir: number, spa
   // KOMBAT: a fighter who is down cannot be hit again until up; a blow held on the guard is only chip.
   const rules = rulesOf(match);
   if (!rules.hitsDown && target.state === 'knockdown') return 0;
+  // The first frames of a backdash slip any blow struck by hand.
+  if (rules.dash && blow.contact && target.state === 'backdash' && target.dashT <= rules.dash.invulnerable) return 0;
   if (guarding(match, ti, blow.from)) return blocked(match, ai, ti, blow, dir, sparkX, sparkZ);
   // Already reeling: this blow carries the combo on.
   const reeling = target.hitstun > 0 || target.knockdownOnLand;
@@ -1357,6 +1447,7 @@ function startFatality(match: Match, winner: 0 | 1): void {
   w.airVx = 0;
   w.airborne = false;
   w.knockdownOnLand = false;
+  w.airAttack = false;
   w.hitstop = 0;
   w.cast = undefined;
   w.dash = undefined;
@@ -1497,7 +1588,13 @@ function attacks(match: Match, i: 0 | 1): void {
       f.hitDone = true;
       return;
     }
-    if (!inReach(f, target, table.weapon.range + REACH_SLACK, false)) return;
+    // A jumping attack reaches down: a target ahead, or just under, no higher than the attacker.
+    if (f.airAttack) {
+      const ahead = f.facing * (target.x - f.x);
+      if (ahead < -AIR_UNDER || ahead > table.weapon.range + REACH_SLACK || target.z > f.z + 0.5) return;
+    } else if (!inReach(f, target, table.weapon.range + REACH_SLACK, false)) {
+      return;
+    }
     f.hitDone = true;
     // The string's blows hit as hard as their share of the weapon; the last pushes twice as far and knocks down.
     const rules = rulesOf(match);
@@ -1577,10 +1674,16 @@ function physics(match: Match): void {
         f.vz = 0;
         f.airVx = 0;
         f.airborne = false;
+        const attacked = f.airAttack;
+        f.airAttack = false;
         if (f.knockdownOnLand) {
           f.knockdownOnLand = false;
           if (f.stunT > 0) play(f, 'stun', 'dazed');
           else play(f, 'knockdown', 'knockdown');
+        } else if (attacked) {
+          // Out of a jumping attack the landing takes a moment to recover from.
+          play(f, 'idle', 'jumpEnd');
+          f.lag = rulesOf(match).airAttack?.recover ?? 0;
         } else if (f.state === 'jump') {
           play(f, 'idle', 'jumpEnd');
         }
@@ -1632,6 +1735,7 @@ function checkFinish(match: Match): void {
   l.airVx = 0;
   l.airborne = false;
   l.knockdownOnLand = false;
+  l.airAttack = false;
   l.hitstop = 0;
   l.cast = undefined;
   l.dash = undefined;
@@ -1653,7 +1757,10 @@ function checkFinish(match: Match): void {
   w.buffered = -1;
   w.bufferedT = 0;
   w.queued = false;
-  if (w.state === 'stun' || w.state === 'fear' || w.state === 'cast' || w.state === 'dash') play(w, 'idle', 'idle');
+  w.hitstun = 0;
+  w.lag = 0;
+  w.dashWant = 0;
+  if (w.state === 'stun' || w.state === 'fear' || w.state === 'cast' || w.state === 'dash' || w.state === 'run' || w.state === 'backdash') play(w, 'idle', 'idle');
   match.projectiles.length = 0;
   match.roundWinner = winner;
   // The sequence starts clean: a key held through the knockdown is not a press.

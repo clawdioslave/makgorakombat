@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { actionable, type Inputs, type Match, tick } from '../../src/engine/engine';
 import { RULES } from '../../src/engine/rules';
+import { fighterView } from '../../src/engine/view';
 import { HP, ROUND_FRAMES } from '../../src/engine/stage';
-import { fakeMatch, inputs, place, rig, run, skipIntro, until, WARRIOR } from './fake';
+import { fakeMatch, inputs, MAGE, NONE, place, rig, run, skipIntro, until, WARRIOR } from './fake';
 
 const K = RULES.kombat;
 
@@ -199,5 +200,187 @@ describe('KOMBAT: no dice', () => {
     tap(match);
     until(match, (m) => m.fighters[1].hp < HP, 30);
     expect(match.fighters[1].hp).toBe(HP - 12);
+  });
+});
+
+/** Ticks each of `steps` once for P1, P2 idle. */
+function keys(match: Match, steps: Inputs[]): void {
+  for (const step of steps) tick(match, [step, inputs()]);
+}
+
+describe('KOMBAT: movement', () => {
+  it('walks faster than the Warcraft rules and backs off at their old forward speed', () => {
+    const match = kombat(4);
+    const f = match.fighters[0];
+    const x = f.x;
+    run(match, 10, [inputs({ right: true }), inputs()]);
+    expect(f.x - x).toBeCloseTo(10 * K.walk, 5);
+    const y = f.x;
+    run(match, 10, [inputs({ left: true }), inputs()]);
+    expect(y - f.x).toBeCloseTo(10 * K.back, 5);
+  });
+
+  it('a double tap forward runs at the opponent, and the run can be cut into a swing', () => {
+    const match = kombat(6);
+    const f = match.fighters[0];
+    const x = f.x;
+    keys(match, [inputs({ right: true }), inputs({ right: true }), inputs(), inputs(), inputs({ right: true })]);
+    expect(f.state).toBe('run');
+    run(match, K.dash!.frames, [inputs({ right: true }), inputs()]);
+    expect(f.state).not.toBe('run');
+    // Two frames of walking, then the run's ten.
+    expect(f.x - x).toBeCloseTo(2 * K.walk + K.dash!.frames * K.dash!.speed, 5);
+    // A second run, cut into a swing four frames in.
+    place(match, 6);
+    run(match, 20);
+    keys(match, [inputs({ right: true }), inputs(), inputs({ right: true })]);
+    expect(f.state).toBe('run');
+    keys(match, [inputs(), inputs(), inputs(), inputs({ attack: true })]);
+    expect(f.state).toBe('run');
+    tick(match, [inputs(), inputs()]);
+    expect(f.state).toBe('attack');
+  });
+
+  it('two presses too far apart, or a long first press, only walk', () => {
+    const match = kombat(6);
+    const f = match.fighters[0];
+    keys(match, [inputs({ right: true }), ...Array.from({ length: K.dash!.window + 1 }, () => inputs()), inputs({ right: true })]);
+    expect(f.state).toBe('walk');
+    keys(match, [inputs(), ...Array.from({ length: K.dash!.tap + 2 }, () => inputs({ right: true })), inputs(), inputs({ right: true })]);
+    expect(f.state).toBe('walk');
+  });
+
+  it('a double tap back hops away, out of reach of a swing for its first frames', () => {
+    const match = kombat(1.5);
+    const [a, b] = match.fighters;
+    const x = b.x;
+    rig(match, 'hit');
+    tap(match);
+    // P2 hops back as P1's blow is about to land.
+    const steps = [inputs({ right: true }), inputs(), inputs({ right: true })];
+    for (const step of steps) tick(match, [inputs(), step]);
+    expect(b.state).toBe('backdash');
+    run(match, 6);
+    expect(b.hp).toBe(HP);
+    expect(a.hitDone).toBe(true);
+    run(match, 10);
+    expect(b.x - x).toBeGreaterThan(K.dash!.backFrames * K.dash!.backSpeed - 0.01);
+  });
+});
+
+describe('KOMBAT: the jumping attack', () => {
+  /** P1 jumps from `gap` away and presses attack on the way up. */
+  function jumpIn(gap: number): Match {
+    const match = kombat(gap);
+    tick(match, [inputs({ jump: true }), inputs()]);
+    tick(match, [inputs({ attack: true }), inputs()]);
+    return match;
+  }
+
+  it('waits for the top of the jump, hits a grounded target under it and lands into a short recovery', () => {
+    const match = jumpIn(1.6);
+    const [a, b] = match.fighters;
+    expect(a.state).toBe('jump');
+    expect(until(match, (m) => m.fighters[0].state === 'attack', 40)).toBeGreaterThan(0);
+    expect(a.vz).toBeLessThanOrEqual(0);
+    expect(a.airAttack).toBe(true);
+    rig(match, 'hit');
+    expect(until(match, (m) => m.fighters[1].hp < HP, 40)).toBeGreaterThan(0);
+    expect(b.hp).toBe(HP - 8);
+    expect(b.hitstun).toBeGreaterThan(0);
+    expect(until(match, (m) => !m.fighters[0].airborne, 60)).toBeGreaterThan(0);
+    expect(a.lag).toBe(K.airAttack!.recover);
+    expect(actionable(match, 0)).toBe(false);
+    run(match, K.airAttack!.recover);
+    expect(actionable(match, 0)).toBe(true);
+  });
+
+  it('one attack a jump', () => {
+    const match = jumpIn(5);
+    const a = match.fighters[0];
+    let swings = 0;
+    let last = a.swings;
+    for (let n = 0; n < 60; n++) {
+      tick(match, [inputs({ attack: n % 2 === 0 }), inputs()]);
+      if (a.swings !== last) {
+        last = a.swings;
+        if (a.airborne) swings++;
+      }
+    }
+    expect(swings).toBe(1);
+  });
+
+  it('the Warcraft rules swing nothing in the air', () => {
+    const match = fakeMatch();
+    skipIntro(match);
+    place(match, 1.6);
+    tick(match, [inputs({ jump: true }), inputs()]);
+    run(match, 30, [inputs({ attack: true }), inputs()]);
+    expect(match.fighters[0].airAttack).toBe(false);
+  });
+});
+
+describe('KOMBAT: specials', () => {
+  it('an ability pressed once a swing is active cancels the swing into it at once', () => {
+    const match = kombat(1.5);
+    const a = match.fighters[0];
+    a.resource = 100;
+    rig(match, 'hit');
+    tap(match);
+    expect(until(match, (m) => m.fighters[1].hp < HP, 30)).toBeGreaterThan(0);
+    const swung = a.t;
+    rig(match, 'hit');
+    tick(match, [inputs({ ability: 1 }), inputs()]); // Mortal Strike, during the hitstop
+    expect(until(match, (m) => m.fighters[0].state === 'ability', 10)).toBeGreaterThanOrEqual(0);
+    // Well before the swing would have let go of them by itself.
+    expect(swung).toBeLessThan(K.swingHit.recover * 1000);
+    expect(until(match, (m) => m.fighters[1].hp < HP - 8, 60)).toBeGreaterThan(0);
+    expect(match.fighters[1].hp).toBe(HP - 8 - 18);
+    expect(match.combo[0]).toBe(2);
+  });
+
+  it('half the global cooldown, half the cast, twice the mana', () => {
+    const match = kombat(5, 1, [MAGE, WARRIOR]);
+    const mage = match.fighters[0];
+    tick(match, [inputs({ ability: 0 }), inputs()]); // Frostbolt
+    expect(mage.gcd).toBe(K.gcd);
+    expect(mage.cast?.total).toBe(45);
+    expect(fighterView(match, 0).abilities[0]!.castTime).toBe(45);
+    mage.resource = 50;
+    mage.cast = undefined;
+    mage.state = 'idle';
+    tick(match, NONE);
+    expect(mage.resource).toBeCloseTo(50 + 2 * (3 / 60), 5);
+  });
+});
+
+describe('KOMBAT: determinism', () => {
+  function scripted(frame: number): [Inputs, Inputs] {
+    const a = inputs({
+      right: frame % 7 < 4 || frame % 41 === 2,
+      left: frame % 11 === 0,
+      attack: frame % 9 < 2,
+      jump: frame % 53 === 0,
+      abilities: [frame % 61 === 0, frame % 97 === 0, frame % 37 === 0],
+    });
+    const b = inputs({
+      left: frame % 5 < 3,
+      right: frame % 29 > 25,
+      attack: frame % 13 < 3,
+      jump: frame % 71 === 0,
+      abilities: [frame % 47 === 0, frame % 89 === 0, frame % 41 === 0],
+    });
+    return [a, b];
+  }
+
+  it('the same seed and inputs give the same match after 2000 ticks', () => {
+    const a = fakeMatch(42, [MAGE, WARRIOR], [false, false], 'kombat');
+    const b = fakeMatch(42, [MAGE, WARRIOR], [false, false], 'kombat');
+    for (let f = 0; f < 2000; f++) {
+      tick(a, scripted(f));
+      tick(b, scripted(f));
+    }
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    expect(a.round > 1 || a.fighters[0].hp + a.fighters[1].hp < 2 * HP).toBe(true);
   });
 });
