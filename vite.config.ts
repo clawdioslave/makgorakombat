@@ -8,8 +8,9 @@ import { defineConfig } from 'vitest/config';
 const mogshot = fileURLToPath(new URL(process.env.MOGSHOT_SRC ?? 'vendor/mogshot/src', import.meta.url));
 
 export default defineConfig({
-  // Served from https://realworldbuilder.github.io/makgorakombat/
-  base: '/makgorakombat/',
+  // Served from https://realworldbuilder.github.io/makgorakombat/; VITE_BASE=/ for a site of its own
+  // (pnpm run deploy:site, https://makgora.clawdioslave.com/).
+  base: process.env.VITE_BASE ?? '/makgorakombat/',
   plugins: [preact()],
   worker: { format: 'es' },
   // Only the game's own page is scanned: the submodule's pages pull in things the game does not use.

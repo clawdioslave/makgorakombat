@@ -1,7 +1,7 @@
 /* LifeCraft, the fan-made Warcraft lettering, for the MAK'GORA half of the logo. */
 @font-face {
   font-family: 'LifeCraft';
-  src: url('/makgorakombat/fonts/LifeCraft.woff2') format('woff2'), url('/makgorakombat/fonts/LifeCraft.ttf') format('truetype');
+  src: url('/fonts/LifeCraft.woff2') format('woff2'), url('/fonts/LifeCraft.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
