@@ -308,6 +308,8 @@ function styleOf(text: FloatingText, human: [boolean, boolean]): TextStyle {
       return { size: 18, colour: '#ffb347', font: SERIF, word: true };
     case 'info':
       return { size: 13, colour: '#ff8a8a', font: SERIF, word: true };
+    case 'combo':
+      return { size: 24, colour: GOLD, font: SERIF, word: true };
   }
 }
 

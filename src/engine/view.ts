@@ -60,6 +60,8 @@ export interface FighterView {
   wins: number;
   /** 'idle', 'attack', 'cast', 'stun' ... as the engine names them. */
   state: string;
+  /** KOMBAT: blows landed in a row on the other fighter while they reel; the HUD's 2 HITS from 2 on. */
+  combo: number;
   /** The game's red error line: why the last press was refused (NOT ENOUGH RAGE, OUT OF RANGE, NOT READY ...), for about 0.75 s; then undefined. */
   notice: string | undefined;
 }
@@ -128,6 +130,7 @@ export function fighterView(match: Match, i: 0 | 1): FighterView {
     effects,
     wins: f.wins,
     state: f.state,
+    combo: match.combo[i],
     notice: match.texts.filter((t) => t.side === i && t.kind === 'info').at(-1)?.text,
   };
 }
