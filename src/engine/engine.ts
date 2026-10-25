@@ -1,9 +1,10 @@
-import { ABILITY_MELEE_RANGE, ABILITY_SLOTS, DOT_TICK_FRAMES, EXECUTE_BELOW, GCD_FRAMES, MAX_RESOURCE, RESOURCE_NAMES, type ResolvedAbility, type SlotIndex } from './abilities';
+import { ABILITY_MELEE_RANGE, ABILITY_SLOTS, DOT_TICK_FRAMES, EXECUTE_BELOW, MAX_RESOURCE, RESOURCE_NAMES, type ResolvedAbility, type SlotIndex } from './abilities';
 import { BRAND } from './brand';
 import { type Beat, directionOf, impactFrame, PENALTY_FRAMES, type SequenceToken, STEP_FRAMES } from './fatalities';
 import { type Move, type MoveRef, type MoveTable, variationOf } from './moves';
+import { type Rules, RULES, type RulesName } from './rules';
 import {
-  BACK, BODY, FINISH_FRAMES, GRAVITY, HALF, HP, INTRO_FRAMES, JUMP_V, KO_SLOWMO, ROUND_END_FRAMES, ROUND_FRAMES,
+  BODY, FINISH_FRAMES, GRAVITY, HALF, HP, INTRO_FRAMES, JUMP_V, KO_SLOWMO, ROUND_END_FRAMES, ROUND_FRAMES,
   ROUNDS_TO_WIN, START_X, TICK_MS, WALK,
 } from './stage';
 
@@ -12,7 +13,8 @@ import {
  * target is in reach, abilities on a global cooldown and their own cooldowns paid for in rage,
  * energy, mana, focus, runic power or fury, casts with a bar that damage interrupts, and every
  * blow rolled on the hit table: miss, dodge, parry, block, crit or a plain hit. Sixty ticks a
- * second, no DOM, the same seed and inputs always giving the same fight.
+ * second, no DOM, the same seed and inputs always giving the same fight. The KOMBAT rules
+ * (rules.ts) fight the same fighters as a fighting game; whatever differs is read from there.
  */
 
 /** What a fighter is doing, coarser than the move it plays. */
@@ -239,6 +241,8 @@ export interface CpuMemory {
 }
 
 export interface Match {
+  /** Which rules the fight is fought under; their numbers are RULES[rules]. */
+  rules: RulesName;
   tables: [MoveTable, MoveTable];
   names: [string, string];
   fighters: [Fighter, Fighter];
@@ -305,15 +309,11 @@ const LEAP_V = 0.16;
 const LEAP_VX = 0.12;
 const SLOW_FACTOR = 0.5;
 const BLOCK_FACTOR = 0.6;
-/** A melee crit doubles; a spell crit is half again, as in the game. */
-const CRIT_FACTOR = { melee: 2, spell: 1.5 } as const;
-/** Swings and strikes play faster than the model's clip, so a blow reads as a blow. */
-const ATTACK_RATE = 1.35;
 /** Speed given to the target by a blow; it decays by 0.82 a frame, so the distance is about 5.5 times this. The game has none; a nudge sells the impact. */
 const PUSHBACK = { swing: 0.035, ability: 0.07, spell: 0.03, bolt: 0.05, charge: 0.2 } as const;
 
-/** The hit table. Parry only from the front, block only with a shield, none of them against a helpless target. */
-export const HIT_TABLE = { miss: 0.05, dodge: 0.06, evasion: 0.5, parry: 0.06, block: 0.1, crit: 0.15, spellMiss: 0.03 } as const;
+/** The game's hit table, as the WARCRAFT rules roll it. */
+export const HIT_TABLE = RULES.warcraft.hitTable;
 
 /** Rage, fury and runic power earned when a swing lands, and rage when a blow is taken. */
 const GAIN_ON_SWING = { oneHand: 10, twoHand: 17 } as const;
@@ -386,8 +386,9 @@ function resetRound(match: Match): void {
   showBanner(match, BRAND.round(match.round));
 }
 
-export function newMatch(tables: [MoveTable, MoveTable], seed: number, names: [string, string] = ['P1', 'P2']): Match {
+export function newMatch(tables: [MoveTable, MoveTable], seed: number, names: [string, string] = ['P1', 'P2'], rules: RulesName = 'warcraft'): Match {
   const match: Match = {
+    rules,
     tables,
     names,
     fighters: [newFighter(0, tables[0]), newFighter(1, tables[1])],
@@ -411,6 +412,11 @@ export function newMatch(tables: [MoveTable, MoveTable], seed: number, names: [s
   };
   showBanner(match, BRAND.round(1));
   return match;
+}
+
+/** The numbers of the rules the match is fought under. */
+export function rulesOf(match: Match): Rules {
+  return RULES[match.rules];
 }
 
 /** Advances the match's LCG and returns a number in [0, 1). */
@@ -470,10 +476,8 @@ export function actionable(match: Match, i: 0 | 1): boolean {
     case 'back':
     case 'hit':
       return true;
-    case 'attack': {
-      const move = moveOf(match, i, f.move);
-      return f.t >= (move.hit?.recover ?? 1) * durationOf(match, i);
-    }
+    case 'attack':
+      return f.t >= rulesOf(match).swingHit.recover * durationOf(match, i);
     case 'ability': {
       // A buff or a blink does not hold the fighter; a strike does, until it is half played.
       const kind = abilityOf(match, i, f.ability).kind;
@@ -606,6 +610,11 @@ function launch(match: Match, i: 0 | 1, ability: number, damage: number): void {
   });
 }
 
+/** Frames the ability's cast bar takes under the match's rules. */
+export function castFrames(match: Match, a: ResolvedAbility): number {
+  return Math.round(a.cast * rulesOf(match).cast);
+}
+
 /** Tries to use ability `n`; true when it started. A refused press says why over the fighter. */
 export function useAbility(match: Match, i: 0 | 1, n: number): boolean {
   const f = match.fighters[i];
@@ -617,12 +626,12 @@ export function useAbility(match: Match, i: 0 | 1, n: number): boolean {
     text(match, i, 'info', why);
     return false;
   }
-  if (a.gcd) f.gcd = GCD_FRAMES;
+  if (a.gcd) f.gcd = rulesOf(match).gcd;
   f.ability = n;
   f.queued = false;
   // A cast pays its cost and starts its cooldown only when it goes off.
   if (a.cast > 0) {
-    f.cast = { ability: n, t: 0, total: a.cast };
+    f.cast = { ability: n, t: 0, total: castFrames(match, a) };
     play(f, 'cast', `cast${n as SlotIndex}`);
     return true;
   }
@@ -701,6 +710,7 @@ function applyInputs(match: Match, i: 0 | 1, inputs: Inputs): void {
   const f = match.fighters[i];
   const o = match.fighters[other(i)];
   const table = match.tables[i];
+  const rules = rulesOf(match);
   const dir = (inputs.right ? 1 : 0) - (inputs.left ? 1 : 0);
   // Moving or jumping cancels a cast.
   if (f.cast && f.state === 'cast' && (dir !== 0 || inputs.jump)) cancelCast(f);
@@ -742,13 +752,13 @@ function applyInputs(match: Match, i: 0 | 1, inputs: Inputs): void {
     const forward = dir * f.facing > 0;
     const wanted: MoveRef = forward ? 'walk' : 'back';
     if (f.move !== wanted || f.state !== wanted) play(f, wanted, wanted);
-    f.x += dir * (forward ? WALK : BACK) * (f.slowT > 0 ? SLOW_FACTOR : 1);
+    f.x += dir * (forward ? rules.walk : rules.back) * (f.slowT > 0 ? SLOW_FACTOR : 1);
     return;
   }
   // Holding the attack with nowhere else to go follows the target into reach, as the game's follow does.
   if (f.auto && !table.weapon.ranged && !inReach(f, o, table.weapon.range, false) && Math.abs(o.z - f.z) < 1.2 && o.state !== 'death') {
     if (f.move !== 'walk' || f.state !== 'walk') play(f, 'walk', 'walk');
-    f.x += f.facing * WALK * (f.slowT > 0 ? SLOW_FACTOR : 1);
+    f.x += f.facing * rules.walk * (f.slowT > 0 ? SLOW_FACTOR : 1);
     return;
   }
   // A move past its recover point plays out unless something else is asked for.
@@ -760,7 +770,9 @@ function advanceMove(match: Match, i: 0 | 1): void {
   const f = match.fighters[i];
   const move = moveOf(match, i, f.move);
   const duration = variationOf(move, f.variation).duration;
-  const rate = f.state === 'attack' || f.state === 'ability' ? ATTACK_RATE : 1;
+  // Swings and strikes play faster than the model's clip, so a blow reads as a blow.
+  const rules = rulesOf(match);
+  const rate = f.state === 'attack' ? rules.swingRate : f.state === 'ability' ? rules.abilityRate : 1;
   f.t += TICK_MS * match.slowmo * rate;
   if (f.t < duration) return;
   if (move.loop) {
@@ -803,7 +815,7 @@ function timers(match: Match, i: 0 | 1): void {
   if (f.lockoutT > 0) f.lockoutT--;
   if (f.absorbT > 0 && --f.absorbT === 0) f.absorb = 0;
   if (f.state === 'death' || f.state === 'dazed') return;
-  if (kit.regen > 0) f.resource = Math.min(MAX_RESOURCE, f.resource + kit.regen);
+  if (kit.regen > 0) f.resource = Math.min(MAX_RESOURCE, f.resource + kit.regen * (kit.resource === 'mana' ? rulesOf(match).manaRegen : 1));
   if (f.stunT > 0 && --f.stunT === 0 && f.state === 'stun') play(f, 'idle', 'idle');
   if (f.fearT > 0 && --f.fearT === 0 && f.state === 'fear') play(f, 'idle', 'idle');
   // A feared fighter runs from the opponent.
@@ -890,6 +902,7 @@ export function rollHit(match: Match, ai: 0 | 1, ti: 0 | 1, roll: Roll): Outcome
   if (roll === 'none') return 'hit';
   const attacker = match.fighters[ai];
   const target = match.fighters[ti];
+  const table = rulesOf(match).hitTable;
   const r = nextRandom(match);
   let edge = 0;
   const step = (chance: number): boolean => {
@@ -897,21 +910,21 @@ export function rollHit(match: Match, ai: 0 | 1, ti: 0 | 1, roll: Roll): Outcome
     return r < edge;
   };
   if (roll === 'spell') {
-    if (step(HIT_TABLE.spellMiss)) return 'miss';
-    if (step(HIT_TABLE.crit)) return 'crit';
+    if (step(table.spellMiss)) return 'miss';
+    if (step(table.crit)) return 'crit';
     return 'hit';
   }
-  if (step(HIT_TABLE.miss)) return 'miss';
+  if (step(table.miss)) return 'miss';
   const canAvoid = !helpless(target) && target.state !== 'cast';
   if (canAvoid) {
-    if (step(HIT_TABLE.dodge + (target.evasionT > 0 ? HIT_TABLE.evasion : 0))) return 'dodge';
+    if (step(table.dodge + (target.evasionT > 0 ? table.evasion : 0))) return 'dodge';
     const facingAttacker = target.facing * (attacker.x - target.x) >= 0;
     if (roll === 'melee' && facingAttacker) {
-      if (step(HIT_TABLE.parry)) return 'parry';
-      if (match.tables[ti].weapon.shield && step(HIT_TABLE.block)) return 'block';
+      if (step(table.parry)) return 'parry';
+      if (match.tables[ti].weapon.shield && step(table.block)) return 'block';
     }
   }
-  if (step(HIT_TABLE.crit)) return 'crit';
+  if (step(table.crit)) return 'crit';
   return 'hit';
 }
 
@@ -1040,7 +1053,8 @@ function strike(match: Match, ai: 0 | 1, ti: 0 | 1, blow: Blow, dir: number, spa
   let amount = blow.damage;
   let kind: 'damage' | 'crit' | 'block' = 'damage';
   if (outcome === 'crit') {
-    amount = Math.round(amount * (blow.roll === 'spell' ? CRIT_FACTOR.spell : CRIT_FACTOR.melee));
+    const crit = rulesOf(match).crit;
+    amount = Math.round(amount * (blow.roll === 'spell' ? crit.spell : crit.melee));
     kind = 'crit';
   } else if (outcome === 'block') {
     amount = Math.round(amount * BLOCK_FACTOR);
@@ -1313,8 +1327,8 @@ function attacks(match: Match, i: 0 | 1): void {
   const at = f.t / durationOf(match, i);
 
   if (f.state === 'attack') {
-    const hit = moveOf(match, i, f.move).hit;
-    if (!hit || at < hit.from) return;
+    const hit = rulesOf(match).swingHit;
+    if (at < hit.from) return;
     if (table.weapon.ranged) {
       f.hitDone = true;
       launch(match, i, -1, table.weapon.damage);
@@ -1326,7 +1340,7 @@ function attacks(match: Match, i: 0 | 1): void {
     }
     if (!inReach(f, target, table.weapon.range + REACH_SLACK, false)) return;
     f.hitDone = true;
-    strike(match, i, ti, { damage: table.weapon.damage, roll: 'melee', ability: undefined, pushback: PUSHBACK.swing, hitstop: 8 }, f.facing, target.x - f.facing * 0.3, 1.3 + target.z);
+    strike(match, i, ti, { damage: table.weapon.damage, roll: 'melee', ability: undefined, pushback: PUSHBACK.swing, hitstop: rulesOf(match).swingHitstop }, f.facing, target.x - f.facing * 0.3, 1.3 + target.z);
     return;
   }
 

@@ -1,5 +1,5 @@
 import { ABILITY_SLOTS, GCD_FRAMES, MAX_RESOURCE, RESOURCE_COLOURS, RESOURCE_NAMES, type ResourceKind } from './abilities';
-import { abilityBlocked, type Match } from './engine';
+import { abilityBlocked, castFrames, type Match, rulesOf } from './engine';
 import type { InputAction } from './input';
 import { HP } from './stage';
 
@@ -18,8 +18,9 @@ export interface AbilityView {
   action: InputAction;
   /** Frames left on its own cooldown, and the cooldown's length (0 when it has none). */
   cooldown: { remaining: number; total: number };
-  /** Frames of global cooldown left that hold this ability. */
+  /** Frames of global cooldown left that hold this ability, and the global cooldown's length under the match's rules. */
   gcd: number;
+  gcdTotal: number;
   cost: number;
   /** Frames, 0 for an instant. */
   castTime: number;
@@ -91,8 +92,9 @@ export function fighterView(match: Match, i: 0 | 1): FighterView {
       action: ACTIONS[n]!,
       cooldown: { remaining: f.cooldowns[n]!, total: a.cooldown },
       gcd,
+      gcdTotal: rulesOf(match).gcd,
       cost: a.cost,
-      castTime: a.cast,
+      castTime: castFrames(match, a),
       usable: blocked === undefined && gcd === 0,
       blocked,
       active: f.ability === n && (f.state === 'ability' || f.state === 'cast' || f.state === 'dash'),
