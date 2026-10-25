@@ -52,7 +52,7 @@ export class Fighters {
 
   /** The champion a tile stands for with the player's sex and class choices applied. */
   async champion(tile: Tile, sex: number, classId: number | undefined): Promise<Champion | undefined> {
-    if (tile.kind === 'random') return undefined;
+    if (tile.kind === 'random' || tile.kind === 'create') return undefined;
     if (tile.kind === 'legend') {
       return {
         key: `legend:${tile.legend.slug}:${tile.displayId}`,

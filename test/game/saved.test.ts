@@ -15,7 +15,7 @@ import {
   withoutSaved,
   withSaved,
 } from '../../src/game/saved';
-import { factionOf } from '../../src/game/roster';
+import { CREATE_TILE, factionOf, randomTile } from '../../src/game/roster';
 
 const race = (id: number, name: string, faction: Race['faction']): Race => ({ id, name, key: name.toLowerCase(), file: name, faction, order: id, sexes: [0, 1] } as unknown as Race);
 const RACES = [race(4, 'Night Elf', 'alliance'), race(2, 'Orc', 'horde')];
@@ -120,5 +120,14 @@ describe('saved champions', () => {
 
   it('get ids that differ', () => {
     expect(newSavedId(1000, () => 0.1)).not.toBe(newSavedId(1000, () => 0.2));
+  });
+});
+
+describe('the creator\'s question mark', () => {
+  it('is never a random pick and has no faction', () => {
+    const tiles = [CREATE_TILE, ...savedTiles([thraka], RACES), CREATE_TILE];
+    for (const draw of [0, 0.3, 0.6, 0.99]) expect(randomTile(tiles, () => draw)?.kind).toBe('saved');
+    expect(randomTile([CREATE_TILE], () => 0.5)).toBeUndefined();
+    expect(factionOf(CREATE_TILE)).toBe('');
   });
 });

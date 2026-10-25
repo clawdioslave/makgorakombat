@@ -9,6 +9,8 @@ interface TitleProps {
   phase: Phase;
   dragging: boolean;
   onPick: (input: HTMLInputElement) => void;
+  /** CREATE YOUR CHAMPION is open (or closed): a folder chosen meanwhile opens the roster on the creator's question mark. */
+  onCreate: (open: boolean) => void;
 }
 
 const chromium = typeof window !== 'undefined' && 'chrome' in window;
@@ -34,14 +36,22 @@ export function LogoArt({ small }: { small?: boolean }) {
   );
 }
 
-export function Title({ phase, dragging, onPick }: TitleProps) {
-  const [guide, setGuide] = useState<GuidePage>();
+export function Title({ phase, dragging, onPick, onCreate }: TitleProps) {
+  const [guide, setGuidePage] = useState<GuidePage>();
+  const setGuide = (page: GuidePage | undefined) => {
+    setGuidePage(page);
+    onCreate(page === 'create');
+  };
   const [settings, setSettings] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
   const opening = phase.kind === 'opening';
+  // The folder is on its way: the panel gives way to the opening, and the wish to create stands.
+  useEffect(() => {
+    if (opening) setGuidePage(undefined);
+  }, [opening]);
 
   // The action bar's hotkeys: 1 opens the folder picker (a key press counts as the click the
-  // browser wants), 2 and 3 the guide, 4 the source, 5 the settings.
+  // browser wants), 2 how to play, 3 CREATE YOUR CHAMPION, 4 the source, 5 the settings.
   useEffect(() => {
     if (opening) return;
     const onKey = (event: KeyboardEvent) => {
@@ -49,7 +59,7 @@ export function Title({ phase, dragging, onPick }: TitleProps) {
       switch (event.code) {
         case 'Digit1': case 'Numpad1': picker.current?.click(); break;
         case 'Digit2': case 'Numpad2': setGuide('play'); break;
-        case 'Digit3': case 'Numpad3': setGuide('champion'); break;
+        case 'Digit3': case 'Numpad3': setGuide('create'); break;
         case 'Digit4': case 'Numpad4': window.open(SOURCE, '_blank', 'noreferrer'); break;
         case 'Digit5': case 'Numpad5': setSettings(true); break;
         default: return;
@@ -115,13 +125,13 @@ export function Title({ phase, dragging, onPick }: TitleProps) {
               },
               {
                 key: '3',
-                label: 'YOUR CHAMPION',
+                label: 'CREATE YOUR CHAMPION',
                 icon: GLYPHS.champion,
-                onClick: () => setGuide('champion'),
+                onClick: () => setGuide('create'),
                 tip: [
-                  { left: 'Your Champion', kind: 'name', hue: 'epic' },
+                  { left: 'Create Your Champion', kind: 'name', hue: 'epic' },
                   { left: 'Soulbound' },
-                  { left: 'Use: Bring your own characters into the ring with the Mogshot addon.', hue: 'green' },
+                  { left: 'Use: Make a champion of your own: race, class, look, armour and name. Drop your World of Warcraft folder first.', hue: 'green' },
                 ],
               },
               {
@@ -158,7 +168,7 @@ export function Title({ phase, dragging, onPick }: TitleProps) {
         A fan game. World of Warcraft is Blizzard Entertainment's; the fighters are drawn from your own copy of it with the{' '}
         <a href="https://realworldbuilder.github.io/mogshot/">Mogshot</a> engine.
       </p>
-      {guide && <Guide page={guide} onPage={setGuide} onClose={() => setGuide(undefined)} />}
+      {guide && <Guide page={guide} onPage={setGuide} onClose={() => setGuide(undefined)} onFolder={() => picker.current?.click()} />}
       {settings && <Settings onClose={() => setSettings(false)} />}
     </div>
   );

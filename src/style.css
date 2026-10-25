@@ -773,32 +773,6 @@ code {
   transform-origin: 50% 32%;
 }
 
-.tile.create {
-  display: grid;
-  place-items: center;
-  padding: 6px;
-  text-align: center;
-  border-style: dashed;
-  border-color: #8a6a2a;
-  color: var(--gold);
-  font-family: var(--serif);
-  font-weight: 700;
-  font-size: 0.62rem;
-  letter-spacing: 0.08em;
-  line-height: 1.2;
-}
-
-.tile.create:hover {
-  border-color: var(--gold);
-  background: rgba(255, 209, 0, 0.08);
-}
-
-.tile.create .plus {
-  font-family: var(--heavy);
-  font-size: 2rem;
-  line-height: 1;
-}
-
 .tile .noface {
   display: grid;
   place-items: center;
@@ -1131,7 +1105,7 @@ code {
 
 /* ---- create your champion ------------------------------------------------------------- */
 
-.create-backdrop {
+.creator-backdrop {
   position: fixed;
   inset: 0;
   z-index: 15;
@@ -1141,7 +1115,7 @@ code {
   backdrop-filter: blur(4px);
 }
 
-.create {
+.creator {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
   width: min(1180px, 96vw);
@@ -1153,26 +1127,26 @@ code {
   overflow: hidden;
 }
 
-.create .stage {
+.creator .stage {
   display: flex;
   flex-direction: column;
   min-height: 0;
   padding: 12px 0 14px;
 }
 
-.create .plate-name {
+.creator .plate-name {
   text-align: center;
   padding: 0 16px;
 }
 
-.create .plate-name .name {
+.creator .plate-name .name {
   font-family: var(--heavy);
   font-size: 2.2rem;
   line-height: 1.05;
   letter-spacing: 0.04em;
 }
 
-.create .plate-name .title {
+.creator .plate-name .title {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1183,23 +1157,23 @@ code {
   color: var(--gold);
 }
 
-.create .plate-name img.class {
+.creator .plate-name img.class {
   width: 22px;
   height: 22px;
   border-radius: 4px;
   border: 1px solid var(--gold-dark);
 }
 
-.create .plate-name .status {
+.creator .plate-name .status {
   font-size: 0.85rem;
   color: var(--dim);
 }
 
-.create .plate-name .status.bad {
+.creator .plate-name .status.bad {
   color: #ff6b6b;
 }
 
-.create .column {
+.creator .column {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1209,7 +1183,7 @@ code {
   border-left: 1px solid var(--line);
 }
 
-.create h1 {
+.creator h1 {
   margin: 0 0 10px;
   font-family: var(--serif);
   font-weight: 900;
@@ -1220,7 +1194,7 @@ code {
   text-shadow: 0 2px 0 #000, 0 0 12px rgba(255, 209, 0, 0.25);
 }
 
-.create .rows {
+.creator .rows {
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -1229,7 +1203,7 @@ code {
   gap: 3px;
 }
 
-.create .row {
+.creator .row {
   display: grid;
   grid-template-columns: 92px 24px minmax(0, 1fr) 24px auto;
   align-items: center;
@@ -1239,12 +1213,12 @@ code {
   border-radius: 6px;
 }
 
-.create .row.here {
+.creator .row.here {
   border-color: var(--gold-dark);
   background: rgba(255, 209, 0, 0.07);
 }
 
-.create .row .label {
+.creator .row .label {
   font-family: var(--serif);
   font-weight: 700;
   font-size: 0.78rem;
@@ -1255,15 +1229,15 @@ code {
   white-space: nowrap;
 }
 
-.create .row .pick {
+.creator .row .pick {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
 }
 
-.create .row select,
-.create .row input {
+.creator .row select,
+.creator .row input {
   flex: 1;
   min-width: 0;
   padding: 4px 6px;
@@ -1275,20 +1249,20 @@ code {
   font-size: 0.9rem;
 }
 
-.create .row input {
+.creator .row input {
   grid-column: 2 / -1;
   font-family: var(--serif);
   font-weight: 700;
   letter-spacing: 0.06em;
 }
 
-.create .row select:focus,
-.create .row input:focus {
+.creator .row select:focus,
+.creator .row input:focus {
   outline: none;
   border-color: var(--gold);
 }
 
-.create .row .icon {
+.creator .row .icon {
   width: 26px;
   height: 26px;
   border-radius: 4px;
@@ -1296,7 +1270,7 @@ code {
   object-fit: cover;
 }
 
-.create .row .swatch {
+.creator .row .swatch {
   width: 20px;
   height: 20px;
   flex: none;
@@ -1304,7 +1278,7 @@ code {
   border: 1px solid #c9a24a;
 }
 
-.create .row .arrow {
+.creator .row .arrow {
   width: 24px;
   height: 24px;
   padding: 0;
@@ -1317,36 +1291,36 @@ code {
   cursor: pointer;
 }
 
-.create .row .arrow:hover {
+.creator .row .arrow:hover {
   border-color: var(--gold);
 }
 
-.create .row.wait {
+.creator .row.wait {
   grid-template-columns: 92px 1fr;
 }
 
-.create .row.actions {
+.creator .row.actions {
   display: flex;
   justify-content: center;
   gap: 8px;
   margin-top: 6px;
 }
 
-.create .button {
+.creator .button {
   background: linear-gradient(180deg, #5a1010, #2a0606);
 }
 
-.create .button.on {
+.creator .button.on {
   border-color: var(--gold);
   box-shadow: 0 0 0 2px rgba(255, 209, 0, 0.35);
 }
 
-.create .button.roll {
+.creator .button.roll {
   padding: 3px 8px;
   font-size: 0.7rem;
 }
 
-.create .armour-tip {
+.creator .armour-tip {
   position: absolute;
   right: calc(100% + 8px);
   bottom: 60px;
@@ -1355,20 +1329,20 @@ code {
   text-align: left;
 }
 
-.create .hint {
+.creator .hint {
   margin: 8px 0 0;
   text-align: center;
 }
 
 /* The tile that opens the creator: a gold question mark on the legends' plate. */
-.tile.make {
+.tile.create {
   display: grid;
   place-items: center;
   border-color: var(--gold);
   background: radial-gradient(circle at 50% 40%, #4a2a2e 0%, #1a1012 60%, #0b0708 100%);
 }
 
-.tile.make .ask {
+.tile.create .ask {
   font-family: var(--heavy);
   font-size: 2.8rem;
   line-height: 1;
@@ -1376,7 +1350,7 @@ code {
   text-shadow: 0 3px 0 var(--gold-dark), 0 0 14px rgba(255, 209, 0, 0.4);
 }
 
-.tile.make .name {
+.tile.create .name {
   justify-content: center;
   color: var(--gold);
 }
@@ -1405,18 +1379,34 @@ code {
 }
 
 @media (max-width: 720px) {
-  .create {
+  .creator {
     grid-template-columns: 1fr;
     grid-template-rows: 38vh 1fr;
     height: 96vh;
   }
 
-  .create .column {
+  .creator .column {
     border-left: none;
     border-top: 1px solid var(--line);
   }
 
-  .create .armour-tip {
+  .creator .armour-tip {
     display: none;
   }
+}
+
+.guide .body.create-first {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 28px 24px 30px;
+  text-align: center;
+}
+
+.guide .body.create-first .big {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--gold);
 }

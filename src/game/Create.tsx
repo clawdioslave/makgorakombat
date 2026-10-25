@@ -106,7 +106,7 @@ function savedDraft(saved: SavedChampion): Draft {
     choices: saved.choices,
     gear: saved.gear,
     worn: [],
-    armour: { kind: 'kept', label: saved.armour ?? 'Their own' },
+    armour: saved.armour === 'Random' ? { kind: 'random' } : saved.armour === 'None' ? { kind: 'none' } : { kind: 'kept', label: saved.armour ?? 'Their own' },
     name: saved.name,
     named: true,
   };
@@ -395,6 +395,11 @@ export function Create({ races, classes, portraits, fighters, saved, editing, on
       const s = stateRef.current;
       const typing = event.target instanceof HTMLInputElement;
       event.stopPropagation();
+      // A key held down from the roster (Enter chooses there on the game's keys) must not save or cancel the moment the creator opens.
+      if (event.repeat && !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) {
+        if (!typing) event.preventDefault();
+        return;
+      }
       if (event.code === MENU_KEYS.back) {
         event.preventDefault();
         s.onCancel();
@@ -489,7 +494,7 @@ export function Create({ races, classes, portraits, fighters, saved, editing, on
               }}
               onClick={() => press(which)}
             >
-              {which === 'save' ? 'SAVE' : which === 'cancel' ? 'CANCEL' : deleting ? 'DELETE? AGAIN' : 'DELETE'}
+              {which === 'save' ? 'SAVE' : which === 'cancel' ? 'CANCEL' : deleting ? 'SURE?' : 'DELETE'}
             </button>
           ))}
         </div>
@@ -539,8 +544,8 @@ export function Create({ races, classes, portraits, fighters, saved, editing, on
   const missing = built ? built.result.scene.problems.filter((problem) => /is not installed|is not part of this build/.test(problem)) : [];
 
   return (
-    <div class="create-backdrop">
-      <div class="create">
+    <div class="creator-backdrop">
+      <div class="creator">
         <div class="stage">
           <Preview fighter={built} locked={false} side="middle" />
           <div class="plate-name">
