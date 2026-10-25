@@ -1417,6 +1417,7 @@ code {
   width: min(520px, 94vw);
 }
 
+.guide .body.online-choose,
 .guide .body.online-host,
 .guide .body.online-join {
   display: grid;
@@ -1428,6 +1429,18 @@ code {
 
 .guide.online p {
   margin: 0;
+}
+
+.guide.online .choices {
+  display: flex;
+  gap: 14px;
+}
+
+.guide.online .choices .button {
+  min-width: 9em;
+  padding: 12px 18px;
+  font-size: 1.1rem;
+  background: none;
 }
 
 /* The room code, large enough to read out across a call. */

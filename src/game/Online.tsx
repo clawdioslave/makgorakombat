@@ -4,7 +4,8 @@ import { cleanCode, createRoom, Link, relayUrl, type Role } from './net/relay';
 
 /*
  * PLAY ONLINE: two players, two machines, one room code. HOST makes a room on the relay and
- * shows its code to read out or paste; JOIN takes the code. Once both are in and their pages
+ * shows its code to read out or paste; JOIN takes the code. The panel opens on the choice, so
+ * a guest makes no room it does not need. Once both are in and their pages
  * agree on the game's version, the roster opens with the host as player 1 and the guest as
  * player 2. The same panel as the guide.
  */
@@ -58,7 +59,7 @@ function meetPeer(link: Link, product: string): Promise<string> {
 }
 
 export function Online({ product, onReady, onClose }: OnlineProps) {
-  const [tab, setTab] = useState<Tab>('host');
+  const [tab, setTab] = useState<Tab>();
   const [code, setCode] = useState<string>();
   const [typed, setTyped] = useState('');
   const [status, setStatus] = useState<string>();
@@ -110,6 +111,8 @@ export function Online({ product, onReady, onClose }: OnlineProps) {
       stale = true;
       drop();
       setCode(undefined);
+      setStatus(undefined);
+      setError(undefined);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
@@ -126,11 +129,16 @@ export function Online({ product, onReady, onClose }: OnlineProps) {
       if (event.code === 'Escape') {
         event.stopPropagation();
         onClose();
+      } else if (tab === undefined && (event.code === 'KeyH' || event.code === 'KeyJ')) {
+        // H or J on the choice; the letters typed into the code field are the field's.
+        event.stopPropagation();
+        event.preventDefault();
+        setTab(event.code === 'KeyH' ? 'host' : 'join');
       }
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [onClose]);
+  }, [onClose, tab]);
 
   const join = async () => {
     const room = cleanCode(typed);
@@ -166,7 +174,16 @@ export function Online({ product, onReady, onClose }: OnlineProps) {
           <button class={tab === 'join' ? 'here' : ''} type="button" onClick={() => setTab('join')}>JOIN</button>
           <button class="close" onClick={onClose} aria-label="Close" type="button">✕</button>
         </nav>
-        {tab === 'host' ? (
+        {tab === undefined ? (
+          <div class="body online-choose">
+            <p class="dim">One of you hosts a room; the other joins it with its six letters.</p>
+            <div class="choices">
+              <button type="button" class="button" onClick={() => setTab('host')}>HOST · H</button>
+              <button type="button" class="button" onClick={() => setTab('join')}>JOIN · J</button>
+            </div>
+            <p class="dim small">Each of you needs the game open with your own World of Warcraft folder. Through {relayUrl().replace(/^https?:\/\//, '')}.</p>
+          </div>
+        ) : tab === 'host' ? (
           <div class="body online-host">
             <p class="dim">Give your opponent this code. They choose PLAY ONLINE, then JOIN.</p>
             <div class="code" aria-live="polite">{code ?? '······'}</div>

@@ -78,6 +78,10 @@ On the roster: WASD / arrows move the cursor, J or , choose, H or M go back, U o
 
 The fight's sound is read from the game folder like everything else: weapon swings and impacts by the weapon's subclass, the race's own grunts, wounds, death cry and battle roar, a spell for the class (Fireball for a mage, Shadow Bolt for a warlock, Lightning Bolt for a shaman...), and a gong for each round. The music is the game's too: the login screen's theme under CHOOSE YOUR CHAMPION, and on the VS screen the zone music of the stage under the cursor (Stranglethorn's jungle for Gurubashi, Stormwind's for the Valley of Heroes...), which plays on, quieter, through the fight and drops away under a fatality. Browsers keep audio off until a key is pressed, so the first screen may start quiet.
 
+### Online
+
+**PLAY ONLINE** (6 on the title, **O** on the roster) fights a friend on another computer. Each of you opens the game with your own World of Warcraft folder; one chooses HOST and reads out the six letters it shows, the other chooses JOIN and types them. The host is player 1 and picks the ground; both play on player 1's keys. Nothing of the game files is sent: both machines run the fight themselves in lockstep and only the key presses cross, through a small relay ([`relay/`](relay/README.md), a Cloudflare Worker) that passes them on and keeps nothing. Each press is played four ticks (67 ms) after it is made, on both machines alike; if the other's presses are late the fight holds and says WAITING FOR OPPONENT. The host's move tables run both engines, so a retail and a classic install stay in step while each draws its own animations. SETTINGS names the relay; anyone can deploy their own.
+
 ## Running it yourself
 
 ```
@@ -89,7 +93,7 @@ pnpm dev
 
 The engine (CASC reader, model and animation parsers, skinning, WebGL renderer, the worker that reads the folder) is [Mogshot](https://github.com/realworldbuilder/mogshot), brought in as the submodule `vendor/mogshot`. To work on both at once, point the game at a checkout of Mogshot: `MOGSHOT_SRC=../mogshot/src pnpm dev`.
 
-`pnpm test` runs the engine's tests (the fight itself is deterministic and runs without a browser). `pnpm build` makes the static site in `dist/`; a push to `main` deploys it to GitHub Pages.
+`pnpm test` runs the engine's tests (the fight itself is deterministic and runs without a browser), the lockstep's over a wire in memory, and the handshake's; `MAKGORA_LIVE=1 pnpm vitest run test/game/online.live.test.ts` plays twenty seconds through the deployed relay. The relay has its own tests: `cd relay && pnpm test`. `pnpm build` makes the static site in `dist/`; a push to `main` deploys it to GitHub Pages.
 
 ### Stages
 
