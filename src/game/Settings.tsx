@@ -2,11 +2,13 @@ import { useEffect, useState } from 'preact/hooks';
 import { type InputAction, KEY_LABELS, KEY_LAYOUTS, type KeyLayout, keyLayout, LAYOUT_WORDS, setKeyLayout } from '../engine/input';
 import type { RulesName } from '../engine/rules';
 import { isMuted, setLevel, setMuted, soundSettings } from './sound';
+import { RELAY_URL, relayUrl, setRelayUrl } from './net/relay';
 
 /*
  * Settings, from the title screen: the sound (mute, the music's level, the effects' level), which
- * keys the two players hold, and the rules the fight is fought under. Everything is remembered in
- * the browser; nothing here needs the folder. The same panel as the guide, so it reads as one interface.
+ * keys the two players hold, the rules the fight is fought under, and the relay online play goes
+ * through. Everything is remembered in the browser; nothing here needs the folder. The same panel
+ * as the guide, so it reads as one interface.
  */
 
 const RULES_STORAGE = 'makgora.rules';
@@ -54,9 +56,12 @@ export function Settings({ onClose }: SettingsProps) {
   const [effects, setEffects] = useState(soundSettings().effects);
   const [layout, setLayout] = useState<KeyLayout>(keyLayout());
   const [ruleset, setRuleset] = useState<RulesName>(chosenRules());
+  const [relay, setRelay] = useState(relayUrl());
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // Letters typed in the relay's field are the field's.
+      if (event.target instanceof HTMLInputElement && event.target.type === 'url' && event.code !== 'Escape') return;
       if (event.code === 'Escape') {
         event.stopPropagation();
         onClose();
@@ -164,7 +169,38 @@ export function Settings({ onClose }: SettingsProps) {
           </table>
           <p class="dim small">
             <b>C</b> on the roster switches the keys too · <b>Tab</b> there makes player 2 the keyboard, a gamepad or the computer · a gamepad plays with A B X,
-            the right trigger and Y
+            the right trigger and Y · online you play with player 1's keys whichever side you are
+          </p>
+
+          <h3>Network</h3>
+          <div class="row relay">
+            <label for="setting-relay">Relay</label>
+            <input
+              id="setting-relay"
+              type="url"
+              spellcheck={false}
+              value={relay}
+              placeholder={RELAY_URL}
+              onChange={(event) => {
+                setRelayUrl(event.currentTarget.value);
+                setRelay(relayUrl());
+              }}
+            />
+            <button
+              type="button"
+              class="toggle"
+              disabled={relay === RELAY_URL}
+              onClick={() => {
+                setRelayUrl('');
+                setRelay(relayUrl());
+              }}
+            >
+              DEFAULT
+            </button>
+          </div>
+          <p class="dim small">
+            PLAY ONLINE goes through this relay; both players must use the same one. To run your own, deploy <code>relay/</code> from the game's source to your
+            Cloudflare account and put its address here.
           </p>
 
           <h3>Rules</h3>

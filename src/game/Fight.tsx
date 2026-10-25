@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { type Inputs, type Match, newMatch, poseOf, type Spark, tick } from '../engine/engine';
+import { type Inputs, type Match, moveOf, newMatch, poseOf, type Spark, tick } from '../engine/engine';
 import { InputReader } from '../engine/input';
-import { type MoveTable, resolveMoves } from '../engine/moves';
+import { type MoveTable, resolveMoves, variationOf } from '../engine/moves';
 import { type FighterView, fighterView } from '../engine/view';
 import { CAMERA, TICK_MS } from '../engine/stage';
 import { Arena } from './arena';
@@ -13,7 +13,11 @@ import { LEVEL, music, stageCue } from './music';
 import { isMuted, Mixer, toggleMute } from './sound';
 import type { Source } from './Select';
 import { chosenRules } from './Settings';
+import { isRulesName, type RulesName } from '../engine/rules';
 import type { Ground } from './stages';
+import type { Hello } from './net/handshake';
+import { Lockstep, WAIT_SHOWN_MS } from './net/lockstep';
+import type { Link } from './net/relay';
 
 /*
  * The fight. The engine steps sixty times a second whatever the screen does; each frame the
@@ -25,7 +29,25 @@ interface FightProps {
   stage: Ground;
   p2: Source;
   onBack: () => void;
+  /** Online: the fight runs in lockstep with the other machine. */
+  net?: NetFight;
 }
+
+/** An online fight: the wire, which fighter this machine plays, and what the host's hello fixed. */
+export interface NetFight {
+  link: Link;
+  me: 0 | 1;
+  host: boolean;
+  /** The seed, the match number and the host's tables, which both engines run on. */
+  hello: Hello;
+  /** Said once at the start: a legend, an item or the ground this install draws otherwise than the other. */
+  notes: string[];
+}
+
+/** How the fight stands on the wire, for the banner over it. */
+type NetState = 'waiting' | 'desync' | undefined;
+/** The notes at the start stay up this long. */
+const NOTES_MS = 7000;
 
 const MAX_STEPS = 4;
 
@@ -72,10 +94,24 @@ const SHIELD_CLASSES = new Set([1, 2, 7]);
  * The fighter's moves and class kit, from its animations, its weapon and its class. A legend
  * without a class gets a warrior's kit, or a hunter's behind a bow.
  */
-function tableOf(fighter: BuiltFighter): MoveTable {
+export function tableOf(fighter: BuiltFighter): MoveTable {
   const { champion, result } = fighter;
   const shield = result.wielding === 'oneHand' && champion.classId !== undefined && SHIELD_CLASSES.has(champion.classId) && champion.gear.some(([slot]) => slot === 'offHand');
   return resolveMoves(result.scene.animations, result.wielding, champion.classId, shield);
+}
+
+/**
+ * The pose of fighter `i` in this install's own animations. Online the engine times every move
+ * by the host's tables; when this model's clip for the move is longer or shorter than the
+ * host's, it is stretched to the host's timing, so the blow lands where the engine says.
+ */
+function poseIn(match: Match, i: 0 | 1, table: MoveTable): { sequence: number; time: number } {
+  if (table === match.tables[i]) return poseOf(match, i);
+  const f = match.fighters[i];
+  const played = variationOf(moveOf(match, i, f.move), f.variation);
+  // moveOf reads only the side's table: this install's, in place of the host's.
+  const own = variationOf(moveOf({ tables: [table, table] } as unknown as Match, i, f.move), f.variation);
+  return { sequence: own.sequence, time: (Math.min(f.t, played.duration) * own.duration) / played.duration };
 }
 
 /** How high a fighter's head is, standing: the model's helm point, at its own size; a little under the top of its box without one. */
@@ -84,7 +120,7 @@ function headHeight(fighter: BuiltFighter): number {
   return head ? head[2] : (bounds.max[2] - bounds.min[2]) * 0.88;
 }
 
-export function Fight({ fighters, stage, p2, onBack }: FightProps) {
+export function Fight({ fighters, stage, p2, onBack, net }: FightProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
   const stageElement = useRef<HTMLDivElement>(null);
@@ -96,6 +132,8 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
   const [muted, setMuted] = useState(isMuted());
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
+  const [netState, setNetState] = useState<NetState>();
+  const [notes, setNotes] = useState<string[]>(net?.notes ?? []);
 
   useEffect(() => {
     const ring = new Arena(canvas.current!);
@@ -109,11 +147,17 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
       ring.setFighters(fighters, loaded.flatMap((fx) => fx.slots));
     });
     ring.setGround(stage);
-    const names: [string, string] = [fighters[0].champion.name, fighters[1].champion.name];
-    const seed = seedOf(fighters[0].champion.key + fighters[1].champion.key) + rematch.current;
-    const tables: [MoveTable, MoveTable] = [tableOf(fighters[0]), tableOf(fighters[1])];
-    const rules = chosenRules();
+    // Online the names, the seed, the tables and the rules are the host's, the same on both machines; the poses are this install's.
+    const names: [string, string] = net ? [net.hello.fighters[0].name, net.hello.fighters[1].name] : [fighters[0].champion.name, fighters[1].champion.name];
+    let seed = net ? net.hello.seed : seedOf(fighters[0].champion.key + fighters[1].champion.key) + rematch.current;
+    const own: [MoveTable, MoveTable] = [tableOf(fighters[0]), tableOf(fighters[1])];
+    const tables: [MoveTable, MoveTable] = net ? net.hello.tables : own;
+    const drawn: [MoveTable, MoveTable] = net?.host ? tables : own;
+    const rules: RulesName = net && isRulesName(net.hello.rules) ? net.hello.rules : chosenRules();
     match.current = newMatch(tables, seed, names, rules);
+    let game = net?.hello.game ?? 0;
+    let lockstep = net ? new Lockstep(net.link.channel(), net.me, { game }) : undefined;
+    let shown: NetState;
     const mixer = new Mixer();
     void mixer.load(0, fighters[0].sounds);
     void mixer.load(1, fighters[1].sounds);
@@ -141,7 +185,8 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
     // The keys are read from the window, not the stage element: a click on the DOM frames or anywhere
     // else must not leave the keyboard dead. The stage still takes focus so the arrows do not scroll.
     input.attach(window);
-    input.setSource(1, p2);
+    // Online this keyboard plays as player 1 whichever side it is, and the other side comes over the wire.
+    input.setSource(1, net ? 'remote' : p2);
     stageElement.current!.focus();
 
     let frame = 0;
@@ -155,18 +200,31 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
     const loop = (now: number) => {
       frame = requestAnimationFrame(loop);
       const current = match.current!;
-      owed = held ? 0 : owed + Math.min(now - last, 250);
+      owed = held && !net ? 0 : owed + Math.min(now - last, 250);
       last = now;
       let steps = 0;
       const t0 = performance.now();
       while (owed >= TICK_MS && steps < MAX_STEPS) {
-        // The reader asks the CPU itself when player 2 is the computer; asking twice would lose its presses.
-        const inputs: [Inputs, Inputs] = input.read(current);
-        tick(current, inputs);
+        if (lockstep) {
+          // A tick runs once both players' inputs for it are here; until then the fight holds, with no debt run up.
+          if (!lockstep.step(current, () => input.read(current)[0])) {
+            owed = Math.min(owed, TICK_MS);
+            break;
+          }
+        } else {
+          // The reader asks the CPU itself when player 2 is the computer; asking twice would lose its presses.
+          const inputs: [Inputs, Inputs] = input.read(current);
+          tick(current, inputs);
+        }
         owed -= TICK_MS;
         steps++;
       }
       if (steps === MAX_STEPS) owed = 0;
+      if (lockstep) {
+        const status = lockstep.status();
+        const state: NetState = status.desync ? 'desync' : status.waiting > WAIT_SHOWN_MS ? 'waiting' : undefined;
+        if (state !== shown) setNetState((shown = state));
+      }
       if (steps > 0) {
         mixer.observe(current);
         shaker.observe(current);
@@ -188,7 +246,7 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
       const camera = { ...CAMERA, zoom: CAMERA.zoom / push, panX: CAMERA.panX + shake.x, panY: CAMERA.panY + shake.y - (push - 1) * PUSH_SINK };
       ring.frame(current.fighters.map((fighter) => fighter.x));
       ring.draw(
-        current.fighters.map((fighter, i) => ({ ...poseOf(current, i as 0 | 1), x: fighter.x, z: fighter.z, facing: fighter.facing })),
+        current.fighters.map((fighter, i) => ({ ...poseIn(current, i as 0 | 1, drawn[i]!), x: fighter.x, z: fighter.z, facing: fighter.facing })),
         camera,
         (at) => poseFx(current, fxs, at).flat(),
       );
@@ -204,7 +262,14 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
       const note = debugRef.current
         ? `engine ${times.engine.toFixed(2)} ms · pose+draw ${times.pose.toFixed(2)} ms · hud ${times.draw.toFixed(2)} ms · sounds ${mixer.played}`
         : mutedRef.current ? 'MUTED · M' : undefined;
-      drawHud(ctx, hud.width, hud.height, current, names, (point) => ring.project(camera, point), { human: [true, p2 !== 'cpu'], debug: note, sources: [input.source(0), input.source(1)], anchor: ring.anchor, heads });
+      drawHud(ctx, hud.width, hud.height, current, names, (point) => ring.project(camera, point), {
+        human: [true, net !== undefined || p2 !== 'cpu'],
+        debug: note,
+        sources: [input.source(0), input.source(1)],
+        keys: net ? [0, 0] : undefined,
+        anchor: ring.anchor,
+        heads,
+      });
       // The HUD's own time, shown the next frame.
       times.draw = times.draw * 0.9 + (performance.now() - t2) * 0.1;
     };
@@ -217,26 +282,72 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
       } else if (event.code === 'KeyM') {
         setMuted(toggleMute());
       } else if (event.code === 'Escape') {
+        // Online both go back to the roster together.
+        net?.link.send({ t: 'back' });
         onBack();
       } else if (event.code === 'Enter' && match.current?.phase === 'matchEnd') {
-        rematch.current++;
-        match.current = newMatch(tables, seed + rematch.current, names, rules);
+        if (!net) {
+          rematch.current++;
+          match.current = newMatch(tables, seed + rematch.current, names, rules);
+        } else if (net.host) {
+          // The host calls the rematch; the guest starts it when told.
+          game++;
+          const next = (seed + game) >>> 0;
+          net.link.send({ t: 'rematch', game, seed: next });
+          restart(game, next);
+        }
       }
     };
+    /** A new match on the same tables, and a new lockstep for it: the last match's frames still on the wire are of another game. */
+    const restart = (number: number, next: number) => {
+      lockstep?.dispose();
+      game = number;
+      seed = next;
+      lockstep = new Lockstep(net!.link.channel(), net!.me, { game });
+      match.current = newMatch(tables, seed, names, rules);
+      shown = undefined;
+      setNetState(undefined);
+    };
+    const offLink = net?.link.listen((message) => {
+      if (message.t === 'rematch' && !net.host && message.game !== game) restart(message.game, message.seed);
+    });
     window.addEventListener('keydown', onKey);
     return () => {
       live = false;
       cancelAnimationFrame(frame);
       mixer.dispose();
       input.detach();
+      lockstep?.dispose();
+      offLink?.();
       window.removeEventListener('keydown', onKey);
     };
-  }, [fighters, stage, p2, onBack]);
+  }, [fighters, stage, p2, onBack, net]);
+
+  // The notes on how this install draws the fight go after a while.
+  useEffect(() => {
+    if (notes.length === 0) return;
+    const timer = setTimeout(() => setNotes([]), NOTES_MS);
+    return () => clearTimeout(timer);
+  }, [notes]);
 
   return (
     <div class="screen fight" ref={stageElement} tabIndex={0}>
       <canvas class="ring" ref={canvas} />
       <canvas class="hud" ref={overlay} />
+      {netState === 'waiting' && <div class="net-banner">WAITING FOR OPPONENT</div>}
+      {netState === 'desync' && (
+        <div class="net-banner bad">
+          DESYNC
+          <span>The two games no longer agree, so the match is stopped. Esc goes back to the roster.</span>
+        </div>
+      )}
+      {notes.length > 0 && (
+        <div class="net-notes">
+          {notes.map((note) => (
+            <p key={note}>{note}</p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
