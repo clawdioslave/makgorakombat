@@ -9,6 +9,7 @@ import type { BuiltFighter } from './fighters';
 import { type FighterFx, poseFx } from './fx';
 import { drawHud } from './hud';
 import { seedOf } from './pixels';
+import { LEVEL, music, stageCue } from './music';
 import { isMuted, Mixer, toggleMute } from './sound';
 import type { Source } from './Select';
 import type { Ground } from './stages';
@@ -114,12 +115,15 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
     const mixer = new Mixer();
     void mixer.load(0, fighters[0].sounds);
     void mixer.load(1, fighters[1].sounds);
+    // The stage's music carries on from the VS screen, under the fight, and drops under a fatality.
+    music.play(stageCue(stage.stage), LEVEL.fight);
+    let musicLevel: number = LEVEL.fight;
     // For scripts and the console: the live match and what the fight sounds like.
     (window as unknown as { mk?: { match: () => Match; view: (i: 0 | 1) => FighterView; fighters: () => [BuiltFighter, BuiltFighter]; sounds: () => unknown; spells: () => unknown; hold: (on: boolean) => void; anchor: (side: 0 | 1, id: number) => unknown; times: () => unknown } }).mk = {
       match: () => match.current!,
       view: (i) => fighterView(match.current!, i),
       fighters: () => fighters,
-      sounds: () => ({ played: mixer.played, sides: mixer.summary() }),
+      sounds: () => ({ played: mixer.played, sides: mixer.summary(), music: music.now() }),
       spells: () => fxs.map((fx) => fx?.spells),
       anchor: (side, id) => ring.anchor(side, id),
       // What F3 shows: ms a frame in the engine, posing and drawing the ring, and the HUD.
@@ -170,6 +174,8 @@ export function Fight({ fighters, stage, p2, onBack }: FightProps) {
           shaker.kick(current.tables[current.roundWinner ?? 0].fatality.spec.beats[run.beat]?.shake ?? 0);
         }
         hitsSeen = run?.hits ?? 0;
+        const wantMusic = current.phase === 'fatality' ? LEVEL.fatality : LEVEL.fight;
+        if (wantMusic !== musicLevel) music.level((musicLevel = wantMusic));
       }
       const t1 = performance.now();
       const shake = shaker.offset(current.frame);

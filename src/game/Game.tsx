@@ -6,6 +6,7 @@ import { DataClient } from '@mogshot/worker/client';
 import { Fight } from './Fight';
 import { type BuiltFighter, Fighters } from './fighters';
 import { messageOf, useFolder } from './folder';
+import { LEVEL, music, TITLE } from './music';
 import { pictureUrl } from './pixels';
 import { LEGENDS, legendTiles, type Tile } from './roster';
 import { Select, type Source } from './Select';
@@ -97,6 +98,13 @@ export function Game() {
       stale = true;
     };
   }, [openKey]);
+
+  // The login theme under CHOOSE YOUR CHAMPION; the VS screen and the fight play their stage's own.
+  useEffect(() => {
+    if (!loaded) return;
+    music.use(client.current!);
+    if (screen.kind === 'select') music.play(TITLE, LEVEL.select);
+  }, [loaded, screen.kind]);
 
   const records = useMemo(() => (phase.kind === 'ready' ? phase.records : []), [phase]);
 
