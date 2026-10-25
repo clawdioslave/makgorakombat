@@ -1410,3 +1410,130 @@ code {
   font-size: 1.2rem;
   color: var(--gold);
 }
+
+/* ---- PLAY ONLINE ---------------------------------------------------------------------- */
+
+.guide.online {
+  width: min(520px, 94vw);
+}
+
+.guide .body.online-host,
+.guide .body.online-join {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 24px 24px 22px;
+  text-align: center;
+}
+
+.guide.online p {
+  margin: 0;
+}
+
+/* The room code, large enough to read out across a call. */
+.guide.online .code {
+  width: 7.2em;
+  padding: 6px 0 4px;
+  background: var(--stone);
+  border: 1px solid var(--gold-dark);
+  border-radius: 8px;
+  color: var(--gold);
+  font-family: var(--serif);
+  font-size: 2.6rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-align: center;
+  text-indent: 0.22em;
+  font-variant-numeric: tabular-nums;
+}
+
+.guide.online input.code {
+  outline: none;
+  text-transform: uppercase;
+}
+
+.guide.online input.code::placeholder {
+  color: var(--line);
+}
+
+.guide.online .button[disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.guide.online .waiting {
+  color: var(--text);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.settings .row.relay {
+  grid-template-columns: 7em 1fr auto;
+}
+
+.settings .row.relay input {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--stone);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+/* Over the fight: the wait for the other player's inputs, a desync, and the notes on how this install draws the fight. */
+.fight .net-banner {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  z-index: 5;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  transform: translate(-50%, -50%);
+  padding: 14px 26px;
+  background: rgba(10, 6, 7, 0.82);
+  border: 1px solid var(--gold-dark);
+  border-radius: 8px;
+  color: var(--gold);
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  pointer-events: none;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.fight .net-banner.bad {
+  border-color: var(--blood);
+  color: #ff4a4a;
+  animation: none;
+}
+
+.fight .net-banner span {
+  max-width: 28em;
+  color: var(--dim);
+  font-family: system-ui, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.fight .net-notes {
+  position: absolute;
+  left: 50%;
+  top: 150px;
+  z-index: 5;
+  transform: translateX(-50%);
+  max-width: min(640px, 90vw);
+  pointer-events: none;
+  color: #ffd100;
+  font-size: 0.9rem;
+  text-align: center;
+  text-shadow: 0 1px 3px #000;
+}
+
+.fight .net-notes p {
+  margin: 4px 0;
+}

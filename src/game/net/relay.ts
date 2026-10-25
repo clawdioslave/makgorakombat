@@ -60,7 +60,7 @@ export async function createRoom(base = relayUrl()): Promise<string> {
 type Listener = (message: Message) => void;
 
 /** Messages a screen opened late still wants: the last of each of these kinds is kept and handed to a new listener. */
-const STICKY = new Set<Message['t']>(['roster', 'stage', 'hello']);
+const STICKY = new Set<Message['t']>(['meet', 'roster', 'stage', 'hello']);
 
 /** One player's open socket to the room. */
 export class Link {
@@ -119,7 +119,7 @@ export class Link {
     if (this.ws.readyState === WebSocket.OPEN) this.ws.send(encode(message));
   }
 
-  /** Every message from now on, and the last roster, stage and hello already here. */
+  /** Every message from now on, and the last meet, roster, stage and hello already here. */
   listen(listener: Listener): () => void {
     this.listeners.add(listener);
     for (const message of this.sticky.values()) listener(message);
