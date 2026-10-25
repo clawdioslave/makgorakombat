@@ -89,7 +89,7 @@ export function Guide({ page, onPage, onClose, onFolder }: GuideProps) {
         ) : (
           <div class="body create-first">
             <p class="big">Drop your World of Warcraft folder first.</p>
-            {page === 'online' && <p class="dim">Each player's champions and ground are drawn from their own folder; then one of you hosts a room and the other joins it with its code.</p>}
+            {page === 'online' && <p class="dim">Each player's champions and ground are drawn from their own folder; then give a name, and you find each other under WHO'S HERE: one challenges, the other accepts.</p>}
             {onFolder && (
               <button type="button" class="button" onClick={onFolder}>
                 CHOOSE THE FOLDER · 1

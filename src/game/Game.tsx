@@ -13,8 +13,10 @@ import { LEGENDS, legendTiles, type Tile } from './roster';
 import { loadSaved, type SavedChampion, storeSaved } from './saved';
 import { type OnlinePick, Select, type Source } from './Select';
 import { championOf, type Hello, localize, mismatch, sameStage, stageKeyOf } from './net/handshake';
+import { Lobby, saveName, savedName } from './net/lobby';
+import type { Link } from './net/relay';
 import { VERSION } from './net/version';
-import { Online, type Session } from './Online';
+import { Challenge, enterRoom, Matching, Online, type Session, useLobby } from './Online';
 import { Title } from './Title';
 import { loadGameFonts } from './ui/fonts';
 import { FightUi } from './ui/FightUi';
@@ -68,10 +70,28 @@ export function Game() {
   const [left, setLeft] = useState<string>();
   // The title's PLAY ONLINE was open when the folder was chosen: the panel opens over the roster.
   const onlineNext = useRef(false);
+  // The lobby, once this browser has given a name: open whenever the game is, but for the fights.
+  const [name, setName] = useState(savedName);
+  const lobbyRef = useRef<Lobby>(null);
+  if (name && !lobbyRef.current) lobbyRef.current = new Lobby(name);
+  const lobby = lobbyRef.current ?? undefined;
+  const lobbyState = useLobby(lobby);
+  // A match the lobby made, while both pages find each other in its room.
+  const [matching, setMatching] = useState<{ name: string; error?: string }>();
+  const matchLink = useRef<Link>(null);
   // A stable handler: Fight rebuilds the whole match when its props change, and dragging a file
   // across the window re-renders Game (the title's drop state), which must not restart a fight.
   const backToSelect = useCallback(() => {
     setHello(undefined);
+    setScreen({ kind: 'select' });
+  }, []);
+  /** Two pages met in a room, by the lobby or a code: the roster, online. */
+  const startSession = useCallback((session: Session) => {
+    setShowOnline(false);
+    setMatching(undefined);
+    setLeft(undefined);
+    setHello(undefined);
+    setOnline(session);
     setScreen({ kind: 'select' });
   }, []);
   /** Leaves the room for the roster on this keyboard alone. */
@@ -146,6 +166,65 @@ export function Game() {
 
   const records = useMemo(() => (phase.kind === 'ready' ? phase.records : []), [phase]);
   const product = phase.kind === 'ready' ? phase.opened.info.product : '';
+
+  // The lobby's socket: closed until the roster is up and while a fight is on, busy in an online match.
+  const fighting = screen.kind === 'fight';
+  useEffect(() => {
+    lobby?.setMode(!loaded || fighting ? 'off' : online ? 'busy' : 'free');
+  }, [lobby, loaded, fighting, online]);
+  useEffect(() => () => lobbyRef.current?.close(), []);
+
+  // A match from the lobby: into its room as it says, and on to the roster once both are there.
+  useEffect(() => {
+    if (!lobby) return;
+    return lobby.onMatch((match) => {
+      setShowOnline(false);
+      setMatching({ name: match.with.name });
+      matchLink.current = null;
+      let given = false;
+      const giveUp = setTimeout(() => {
+        given = true;
+        matchLink.current?.close();
+        matchLink.current = null;
+        setMatching({ name: match.with.name, error: `${match.with.name} did not come into the room.` });
+      }, 20_000);
+      void enterRoom(match.code, match.role, product, (link) => {
+        matchLink.current = link;
+      }).then(
+        (session) => {
+          clearTimeout(giveUp);
+          if (given || matchLink.current !== session.link) session.link.close();
+          else startSession(session);
+        },
+        (cause: unknown) => {
+          clearTimeout(giveUp);
+          if (!given) setMatching({ name: match.with.name, error: messageOf(cause) });
+        },
+      );
+    });
+  }, [lobby, product, startSession]);
+
+  /** The meeting given up or failed: back in the lobby, free. */
+  const endMatching = () => {
+    matchLink.current?.close();
+    matchLink.current = null;
+    setMatching(undefined);
+    lobby?.setMode('free');
+  };
+
+  /** A name given on the panel: kept, and the lobby comes under it. */
+  const giveName = (given: string) => {
+    saveName(given);
+    if (lobbyRef.current) lobbyRef.current.rename(given);
+    setName(given);
+  };
+
+  // A notice from the lobby (a decline, a challenge that lapsed) while the panel is shut shows for a moment.
+  useEffect(() => {
+    if (!lobbyState.notice || showOnline) return;
+    const timer = setTimeout(() => lobby?.clearNotice(), 4000);
+    return () => clearTimeout(timer);
+  }, [lobbyState.notice, showOnline, lobby]);
 
   useEffect(() => {
     if (!loaded || !onlineNext.current) return;
@@ -255,6 +334,9 @@ export function Game() {
   if (loadError) return <Title phase={{ kind: 'error', message: loadError }} dragging={false} onPick={onPick} onCreate={wantCreate} onOnline={wantOnline} />;
   if (!loaded) return <Title phase={{ kind: 'opening', message: 'Summoning the roster…' }} dragging={false} onPick={onPick} onCreate={wantCreate} onOnline={wantOnline} />;
 
+  // A challenge shows over any screen but a fight, unless this page is already in a match.
+  const challenge = !online && !matching && screen.kind !== 'fight' ? lobbyState.incoming : undefined;
+
   const view = (() => {
     switch (screen.kind) {
       case 'select':
@@ -278,7 +360,7 @@ export function Game() {
             }}
             onBack={online ? leaveOnline : () => location.reload()}
             online={rosterOnline}
-            paused={showOnline || left !== undefined}
+            paused={showOnline || left !== undefined || matching !== undefined || challenge !== undefined}
             onOnline={() => setShowOnline(true)}
           />
         );
@@ -309,18 +391,11 @@ export function Game() {
     <>
       {view}
       {showOnline && (
-        <Online
-          product={product}
-          onReady={(session) => {
-            setShowOnline(false);
-            setLeft(undefined);
-            setHello(undefined);
-            setOnline(session);
-            setScreen({ kind: 'select' });
-          }}
-          onClose={() => setShowOnline(false)}
-        />
+        <Online lobby={lobby} name={name} onName={giveName} product={product} onReady={startSession} onClose={() => setShowOnline(false)} />
       )}
+      {!showOnline && lobbyState.notice && !challenge && !matching && <div class="lobby-toast">{lobbyState.notice}</div>}
+      {matching && <Matching name={matching.name} error={matching.error} onCancel={endMatching} />}
+      {challenge && <Challenge from={challenge.name} until={challenge.until} onAccept={() => lobby?.accept()} onDecline={() => lobby?.decline()} />}
       {left && (
         <div class="guide-backdrop">
           <div class="guide">

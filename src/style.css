@@ -1427,9 +1427,10 @@ code {
   width: min(520px, 94vw);
 }
 
-.guide .body.online-choose,
-.guide .body.online-host,
-.guide .body.online-join {
+.guide .body.online-here,
+.guide .body.online-name,
+.guide .body.online-code,
+.guide .body.online-challenge {
   display: grid;
   justify-items: center;
   gap: 12px;
@@ -1453,6 +1454,185 @@ code {
   background: none;
 }
 
+/* WHO'S HERE: one row a player, the chosen one lit as the roster lights a tile. */
+.guide.online .me {
+  color: var(--text);
+}
+
+.guide.online .me b {
+  color: var(--gold);
+  font-family: var(--serif);
+}
+
+.guide.online .link {
+  margin-left: 8px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--dim);
+  font: inherit;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.guide.online .link:hover {
+  color: var(--gold);
+}
+
+.guide.online .players {
+  width: 100%;
+  max-height: 46vh;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.guide.online .players li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid transparent;
+  text-align: left;
+}
+
+.guide.online .players li.chosen {
+  background: rgba(255, 209, 0, 0.06);
+  border-left-color: var(--gold);
+}
+
+.guide.online .players .name {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.guide.online .players li.busy .name {
+  color: var(--dim);
+}
+
+.guide.online .players .button {
+  padding: 5px 14px;
+  background: none;
+}
+
+.guide.online .players .asking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.guide.online .nobody {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.guide.online .button.quick {
+  min-width: 14em;
+  padding: 10px 18px;
+  background: none;
+  font-size: 1.05rem;
+}
+
+.guide.online .button.quick.on {
+  background: rgba(255, 209, 0, 0.12);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.guide.online input.name {
+  width: 12em;
+  padding: 8px 10px;
+  background: var(--stone);
+  border: 1px solid var(--gold-dark);
+  border-radius: 8px;
+  outline: none;
+  color: var(--gold);
+  font-family: var(--serif);
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.guide.online input.name::placeholder {
+  color: var(--line);
+}
+
+.guide.online .join-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The thirty seconds of a challenge, emptying. */
+.countdown {
+  flex: none;
+}
+
+.countdown circle {
+  fill: none;
+  stroke-width: 5;
+}
+
+.countdown .track {
+  stroke: var(--line);
+}
+
+.countdown .left {
+  stroke: var(--gold);
+  transition: stroke-dashoffset 0.1s linear;
+}
+
+.countdown text {
+  fill: var(--gold);
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.guide.online.challenge {
+  width: min(420px, 94vw);
+  border-color: var(--gold);
+}
+
+.guide.online .button {
+  white-space: nowrap;
+}
+
+/* Above everything, the guide and the creator too. */
+.challenge-backdrop {
+  z-index: 40;
+}
+
+.guide.online .big {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 1.6rem;
+  color: var(--gold);
+}
+
+.lobby-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 30;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  background: rgba(10, 6, 7, 0.9);
+  border: 1px solid var(--gold-dark);
+  border-radius: 8px;
+  color: var(--text);
+  pointer-events: none;
+}
+
 /* The room code, large enough to read out across a call. */
 .guide.online .code {
   width: 7.2em;
@@ -1473,6 +1653,11 @@ code {
 .guide.online input.code {
   outline: none;
   text-transform: uppercase;
+}
+
+.guide.online .code.small {
+  width: 6.4em;
+  font-size: 1.6rem;
 }
 
 .guide.online input.code::placeholder {

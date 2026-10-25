@@ -166,7 +166,7 @@ export function Title({ phase, dragging, onPick, onCreate, onOnline }: TitleProp
                 tip: [
                   { left: 'Play Online', kind: 'name', hue: 'legendary' },
                   { left: 'Binds when used' },
-                  { left: 'Use: Fight a friend on another computer: one of you hosts a room, the other joins with its six letters. Each needs their own World of Warcraft folder; drop it first.', hue: 'green' },
+                  { left: 'Use: Fight a friend on another computer: give a name, then challenge them by theirs or wait for anyone with QUICK MATCH. Each needs their own World of Warcraft folder; drop it first.', hue: 'green' },
                 ],
               },
             ]}
