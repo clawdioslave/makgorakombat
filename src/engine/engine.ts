@@ -270,6 +270,19 @@ export interface CpuMemory {
   held: Inputs;
   /** Frame of the next decision. */
   next: number;
+  /** KOMBAT: the opponent's swings already weighed for a block, and the frame the guard is held until. */
+  seen: number;
+  guardUntil: number;
+  /** The CPU's own swing already followed up with the string's next press. */
+  chained: number;
+  /** Frames left of a double tap being keyed in. */
+  dash: number;
+  /** The attack key was down in the last inputs given, so the next press must let go first. */
+  pressed: boolean;
+}
+
+export function newCpuMemory(): CpuMemory {
+  return { held: noInputs(), next: 0, seen: 0, guardUntil: 0, chained: 0, dash: 0, pressed: false };
 }
 
 export interface Match {
@@ -435,6 +448,13 @@ function resetRound(match: Match): void {
   match.sequence = undefined;
   match.fatality = undefined;
   match.combo = [0, 0];
+  // The fighters' swing counts start again; so does what the CPU remembers of them.
+  for (const memory of match.cpu) {
+    memory.seen = 0;
+    memory.chained = 0;
+    memory.guardUntil = 0;
+    memory.dash = 0;
+  }
   setPhase(match, 'intro');
   showBanner(match, BRAND.round(match.round));
 }
@@ -459,7 +479,7 @@ export function newMatch(tables: [MoveTable, MoveTable], seed: number, names: [s
     frame: 0,
     roundWinner: undefined,
     winner: undefined,
-    cpu: [{ held: noInputs(), next: 0 }, { held: noInputs(), next: 0 }],
+    cpu: [newCpuMemory(), newCpuMemory()],
     sequence: undefined,
     fatality: undefined,
     combo: [0, 0],

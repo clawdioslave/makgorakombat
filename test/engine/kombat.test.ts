@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { cpuInputs } from '../../src/engine/cpu';
 import { actionable, type Inputs, type Match, tick } from '../../src/engine/engine';
 import { RULES } from '../../src/engine/rules';
 import { fighterView } from '../../src/engine/view';
 import { HP, ROUND_FRAMES } from '../../src/engine/stage';
-import { fakeMatch, inputs, MAGE, NONE, place, rig, run, skipIntro, until, WARRIOR } from './fake';
+import { fakeMatch, HUNTER, inputs, MAGE, NONE, PALADIN, place, rig, ROGUE, run, skipIntro, until, WARRIOR } from './fake';
 
 const K = RULES.kombat;
 
@@ -382,5 +383,102 @@ describe('KOMBAT: determinism', () => {
     }
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
     expect(a.round > 1 || a.fighters[0].hp + a.fighters[1].hp < 2 * HP).toBe(true);
+  });
+});
+
+describe('KOMBAT: the CPU', () => {
+  it('blocks some of the swings thrown at it in reach, and takes the rest', () => {
+    const match = kombat(1.5, 7);
+    const [a, b] = match.fighters;
+    let blocked = 0;
+    let hit = 0;
+    for (let n = 0; n < 60; n++) {
+      // Each swing finds both fighters on their feet and free, whatever the last one left.
+      place(match, 1.5);
+      match.timer = ROUND_FRAMES;
+      for (const f of [a, b]) {
+        f.hp = HP;
+        f.state = 'idle';
+        f.move = 'idle';
+        f.hitstun = 0;
+        f.lag = 0;
+        f.queued = false;
+        f.hitstop = 0;
+      }
+      const was = b.hp;
+      tick(match, [inputs({ attack: true }), cpuInputs(match, 1)]);
+      let guarded = false;
+      for (let k = 0; k < 59; k++) {
+        tick(match, [inputs(), cpuInputs(match, 1)]);
+        if (b.state === 'block') guarded = true;
+      }
+      if (guarded) blocked++;
+      else if (b.hp < was) hit++;
+    }
+    expect(blocked).toBeGreaterThanOrEqual(10);
+    expect(hit).toBeGreaterThanOrEqual(10);
+  });
+
+  it('follows a blow that lands with the rest of the string, to the knockdown', () => {
+    const match = kombat(1.5, 3);
+    const a = match.fighters[0];
+    let best = 0;
+    let down = false;
+    for (let n = 0; n < 600 && !down; n++) {
+      tick(match, [inputs(), cpuInputs(match, 1)]);
+      best = Math.max(best, match.combo[1]);
+      if (a.state === 'knockdown') down = true;
+    }
+    expect(best).toBeGreaterThanOrEqual(3);
+    expect(down).toBe(true);
+  });
+
+  it('runs in with a double tap from afar', () => {
+    const match = kombat(9, 5, [ROGUE, ROGUE]);
+    let ran = false;
+    for (let n = 0; n < 180 && !ran; n++) {
+      tick(match, [inputs(), cpuInputs(match, 1)]);
+      if (match.fighters[1].state === 'run') ran = true;
+    }
+    expect(ran).toBe(true);
+  });
+
+  // A string, a special and a second string keep a fighter reeling for up to about 1.8 s; nothing should hold them 2.5.
+  const LONGEST_COMBO = 150;
+
+  it('two CPUs fight it out: no one is held in hitstun for long, both act, and the rounds are won', () => {
+    for (const [seed, classes] of [[1, [WARRIOR, WARRIOR]], [2, [ROGUE, PALADIN]], [3, [MAGE, WARRIOR]], [4, [HUNTER, ROGUE]]] as const) {
+      const match = fakeMatch(seed, [classes[0], classes[1]], [false, false], 'kombat');
+      const reeling = [0, 0];
+      const longest = [0, 0];
+      let blocks = 0;
+      const acted = [false, false];
+      for (let n = 0; n < 6000 && match.phase !== 'matchEnd'; n++) {
+        tick(match, [cpuInputs(match, 0), cpuInputs(match, 1)]);
+        for (const i of [0, 1] as const) {
+          reeling[i] = match.fighters[i].hitstun > 0 ? reeling[i]! + 1 : 0;
+          longest[i] = Math.max(longest[i]!, reeling[i]!);
+          if (match.fighters[i].state === 'block' && match.fighters[i].t === 0) blocks++;
+          const state = match.fighters[i].state;
+          if (state === 'attack' || state === 'ability' || state === 'cast' || state === 'dash') acted[i] = true;
+        }
+      }
+      expect(Math.max(...longest)).toBeLessThanOrEqual(LONGEST_COMBO);
+      expect(acted).toEqual([true, true]);
+      expect(match.round > 1 || match.phase === 'matchEnd').toBe(true);
+      expect(blocks).toBeGreaterThan(0);
+    }
+  });
+
+  it('still performs its fatality in the finish', () => {
+    const match = kombat(1.5, 3);
+    match.fighters[0].hp = 7;
+    match.fighters[1].resource = 60;
+    rig(match, 'hit');
+    tap(match, 1);
+    expect(until(match, (m) => m.phase === 'finish', 60)).toBeGreaterThan(0);
+    for (let n = 0; n < 300 && match.phase === 'finish'; n++) tick(match, [inputs(), cpuInputs(match, 1)]);
+    expect(match.phase).toBe('fatality');
+    expect(match.fighters[1].state).toBe('finisher');
   });
 });
