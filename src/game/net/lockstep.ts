@@ -153,6 +153,8 @@ export class Lockstep {
   private acked = -1;
   private hash = 0;
   private readonly hashes = new Map<number, number>();
+  /** The state text behind each kept hash, so a desync can be read: which field differed, on which side. */
+  private readonly texts = new Map<number, string>();
   private readonly theirHashes = new Map<number, number>();
   private lastHash: { tick: number; value: number } | undefined;
   private waitingSince: number | undefined;
@@ -213,6 +215,11 @@ export class Lockstep {
     return true;
   }
 
+  /** The match as it was hashed after tick `t`, while it is still kept; for reading a desync. */
+  textAt(t: number): string | undefined {
+    return this.texts.get(t);
+  }
+
   status(): LockstepStatus {
     return {
       waiting: this.waitingSince === undefined ? 0 : this.now() - this.waitingSince,
@@ -257,10 +264,13 @@ export class Lockstep {
 
   /** After tick `t`: hash the match, rolling the last hash in, and hold it against theirs if it came first. */
   private check(t: number, match: Match): void {
-    this.hash = rollHash(this.hash, stateText(match));
+    const text = stateText(match);
+    this.hash = rollHash(this.hash, text);
     this.hashes.set(t, this.hash);
+    this.texts.set(t, text);
     this.lastHash = { tick: t, value: this.hash };
     for (const old of this.hashes.keys()) if (old < t - HASH_EVERY * KEEP_HASHES) this.hashes.delete(old);
+    for (const old of this.texts.keys()) if (old < t - HASH_EVERY * KEEP_HASHES) this.texts.delete(old);
     const theirs = this.theirHashes.get(t);
     if (theirs !== undefined) {
       this.theirHashes.delete(t);

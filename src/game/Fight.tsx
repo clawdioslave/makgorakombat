@@ -165,7 +165,8 @@ export function Fight({ fighters, stage, p2, onBack, net }: FightProps) {
     music.play(stageCue(stage.stage), LEVEL.fight);
     let musicLevel: number = LEVEL.fight;
     // For scripts and the console: the live match and what the fight sounds like.
-    (window as unknown as { mk?: { match: () => Match; view: (i: 0 | 1) => FighterView; fighters: () => [BuiltFighter, BuiltFighter]; sounds: () => unknown; spells: () => unknown; hold: (on: boolean) => void; anchor: (side: 0 | 1, id: number) => unknown; times: () => unknown } }).mk = {
+    (window as unknown as { mk?: { match: () => Match; view: (i: 0 | 1) => FighterView; fighters: () => [BuiltFighter, BuiltFighter]; sounds: () => unknown; spells: () => unknown; hold: (on: boolean) => void; anchor: (side: 0 | 1, id: number) => unknown; times: () => unknown; net: () => Lockstep | undefined } }).mk = {
+      net: () => lockstep,
       match: () => match.current!,
       view: (i) => fighterView(match.current!, i),
       fighters: () => fighters,
