@@ -118,7 +118,7 @@ pnpm mogshot render spec.json     # {"npc": 19015} draws it; a look with a model
 
 The portraits in `public/legends/<slug>.png` are face crops rendered once with the same command (`"camera": {"zoom": 0.3, "panY": -2}` or so, tuned by eye for each model's height), since the browser has no portrait atlas for NPCs.
 
-After the legends stands a champion built into the game, **Cassidy Darkstar**, Chris's night elf druid: a made champion like the player's own (`BUILTIN_CHAMPIONS` in `src/game/saved.ts`, the appearance choices and item ids by number), shown ahead of the CREATE tile, never written to the browser's storage, and not editable or deletable in the creator. [docs/cassidy.json](docs/cassidy.json) draws the same look through the command line ([docs/cassidy.png](docs/cassidy.png)): Crimson Silk Robe, Dark Leather Shoulders and the Staff of Jordan, white hair and beard on the purple skin.
+After the legends stands a champion built into the game, **Cassidy Darkstar**, Chris's night elf druid: a made champion like the player's own (`BUILTIN_CHAMPIONS` in `src/game/saved.ts`, the appearance choices and item ids by number), shown ahead of the CREATE tile, never written to the browser's storage, and not editable or deletable in the creator. [docs/cassidy.json](docs/cassidy.json) draws the same look through the command line ([docs/cassidy.png](docs/cassidy.png)): Crimson Silk Robe, the white Moonlit Amice and the Staff of Jordan, white hair and beard on the grey-lavender skin of her portrait.
 
 ### Spells
 

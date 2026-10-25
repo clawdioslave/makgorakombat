@@ -46,8 +46,8 @@ export const BUILTIN_CHAMPIONS: readonly SavedChampion[] = [
     sex: 0,
     classId: 11,
     choices: [
-      [40, 696], // Skin Color 2, the purple one
-      [41, 719], // Face 1
+      [40, 699], // Skin Color 5, the grey-lavender of her portrait
+      [41, 721], // Face 3, the hard brow
       [42, 739], // Hair Style: Long
       [43, 753], // Hair Color 5, white
       [738, 8083], // Eyebrows: Long
@@ -55,7 +55,7 @@ export const BUILTIN_CHAMPIONS: readonly SavedChampion[] = [
     ],
     gear: [
       ['chest', 7063], // Crimson Silk Robe
-      ['shoulder', 4252], // Dark Leather Shoulders
+      ['shoulder', 11884], // Moonlit Amice, the white mantle she wears in the footage
       ['mainHand', 12182], // Staff of Jordan, as the game's own NPCs carry it
     ],
     armour: 'Chronicle',
