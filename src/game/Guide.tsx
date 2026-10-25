@@ -1,5 +1,5 @@
 import { useEffect } from 'preact/hooks';
-import { type InputAction, KEY_LABELS, KEYS } from '../engine/input';
+import { type InputAction, KEY_LABELS, KEYS, keyLayout, LAYOUT_WORDS } from '../engine/input';
 
 /*
  * The guide: how to play, and how to get your own characters into the ring (the Mogshot
@@ -69,12 +69,17 @@ export function Guide({ page, onPage, onClose }: GuideProps) {
                 <tr><td>Attack (hold to keep swinging)</td><td>{keys(0, 'attack')}</td><td>{keys(1, 'attack')}</td></tr>
                 <tr><td>Abilities, on the action bar</td><td>{keys(0, 'ability1')} · {keys(0, 'ability2')} · {keys(0, 'ability3')}</td><td>{keys(1, 'ability1')} · {keys(1, 'ability2')} · {keys(1, 'ability3')}</td></tr>
                 <tr><td>What an ability does</td><td colSpan={2}>Hover its slot, or hold its key</td></tr>
-                <tr><td>On the roster</td><td>WASD · J choose · H back · U ♂/♀ · K L class</td><td>arrows · , choose · M back · Right Shift ♂/♀ · . / class</td></tr>
+                {keyLayout() === 'wow' ? (
+                  <tr><td>On the roster</td><td>arrows · 1 choose · Backspace back · 4 ♂/♀ · 2 3 class</td><td>WASD · J choose · H back · U ♂/♀ · K L class</td></tr>
+                ) : (
+                  <tr><td>On the roster</td><td>WASD · J choose · H back · U ♂/♀ · K L class</td><td>arrows · , choose · M back · Right Shift ♂/♀ · . / class</td></tr>
+                )}
               </tbody>
             </table>
             <p class="dim small">
-              <b>Tab</b> switches player 2 between the keyboard, a gamepad and the computer · <b>Enter</b> rematch · <b>Esc</b> back ·{' '}
-              <b>M</b> mute · <b>F3</b> frame times
+              <b>C</b> on the roster switches the keys ({LAYOUT_WORDS[keyLayout()]} now): player 1 on the game's own keys, the arrows to move and jump
+              and 1 2 3 4 for the attack and the action bar, with player 2 on WASD and J K L U · <b>Tab</b> switches player 2 between the keyboard, a gamepad
+              and the computer · <b>Enter</b> rematch · <b>Esc</b> back · <b>M</b> mute · <b>F3</b> frame times
             </p>
           </div>
         ) : (

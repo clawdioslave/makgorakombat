@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { ClassEntry, Race } from '@mogshot/character/appearance';
 import type { ImportedRecord } from '@mogshot/import/record';
 import { BRAND } from '../engine/brand';
+import { type KeyLayout, keyLayout, LAYOUT_WORDS, MENU_KEYS, setKeyLayout } from '../engine/input';
 import { type BuiltFighter, type Champion, type Fighters } from './fighters';
 import { headshotOf, storedHeadshot } from './headshot';
 import { Preview } from './Preview';
@@ -60,13 +61,31 @@ const COLUMNS = 8;
 const LEGENDS_ONLY = true;
 const HOVER_MS = 200;
 
-const KEYS: Record<number, Record<string, 'up' | 'down' | 'left' | 'right' | 'confirm' | 'back' | 'sex' | 'classPrev' | 'classNext'>> = {
-  0: { KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', KeyJ: 'confirm', KeyH: 'back', KeyU: 'sex', KeyK: 'classPrev', KeyL: 'classNext' },
-  1: {
-    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-    Numpad1: 'confirm', Comma: 'confirm', Numpad4: 'back', KeyM: 'back',
-    Numpad0: 'sex', ShiftRight: 'sex', Numpad2: 'classPrev', Period: 'classPrev', Numpad3: 'classNext', Slash: 'classNext',
-  },
+type RosterAction = 'up' | 'down' | 'left' | 'right' | 'confirm' | 'back' | 'sex' | 'classPrev' | 'classNext';
+type RosterKeys = Record<string, RosterAction>;
+
+const WASD_ROSTER: RosterKeys = { KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', KeyJ: 'confirm', KeyH: 'back', KeyU: 'sex', KeyK: 'classPrev', KeyL: 'classNext' };
+const ARROWS_ROSTER: RosterKeys = {
+  ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+  Numpad1: 'confirm', Comma: 'confirm', Numpad4: 'back', KeyM: 'back',
+  Numpad0: 'sex', ShiftRight: 'sex', Numpad2: 'classPrev', Period: 'classPrev', Numpad3: 'classNext', Slash: 'classNext',
+};
+/** The game's own keys on the roster: the arrows move, 1 or Enter chooses, Backspace goes back, 4 switches sex, 2 and 3 cycle the class. */
+const DIGITS_ROSTER: RosterKeys = {
+  ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+  Digit1: 'confirm', Enter: 'confirm', Backspace: 'back', Digit4: 'sex', Digit2: 'classPrev', Digit3: 'classNext',
+};
+
+/** The roster keys per player under each layout, matching the fight's (engine/input.ts). */
+const ROSTER_KEYS: Readonly<Record<KeyLayout, readonly [RosterKeys, RosterKeys]>> = {
+  classic: [WASD_ROSTER, ARROWS_ROSTER],
+  wow: [DIGITS_ROSTER, WASD_ROSTER],
+};
+
+/** The roster hint per player under each layout. */
+const ROSTER_HINTS: Readonly<Record<KeyLayout, readonly [[string, string], [string, string]]>> = {
+  classic: [['WASD move · J choose · H back', ' · U ♂/♀ · K/L class'], ['arrows · , or Num1 choose · M back', ' · Right Shift ♂/♀ · . / class']],
+  wow: [['arrows move · 1 choose · Backspace back', ' · 4 ♂/♀ · 2/3 class'], ['WASD move · J choose · H back', ' · U ♂/♀ · K/L class']],
 };
 
 const freshPlayer = (sex: number): Player => ({
@@ -85,6 +104,7 @@ const legendPortrait = (slug: string) => `${import.meta.env.BASE_URL}legends/${s
 
 export function Select({ races, classes, records, legends, portraits, fighters, p2, onP2, onReady, onBack }: SelectProps) {
   const roster = useMemo(() => rosterTiles(races), [races]);
+  const [layout, setLayout] = useState<KeyLayout>(keyLayout());
   const champions = useMemo(() => championTiles(records, races), [records, races]);
   // The rows from the top, leaving out the empty ones; the cursor moves up and down through them.
   // For now the ring is for the legends only (William, 24 Oct 2026); the races and your own
@@ -268,8 +288,13 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
         onP2(order[(order.indexOf(p2Ref.current) + 1) % order.length]!);
         return;
       }
+      if (event.code === MENU_KEYS.layout) {
+        setKeyLayout(keyLayout() === 'wow' ? 'classic' : 'wow');
+        setLayout(keyLayout());
+        return;
+      }
       for (const who of [0, 1] as const) {
-        const action = KEYS[who]![event.code];
+        const action = ROSTER_KEYS[keyLayout()][who][event.code];
         if (!action) continue;
         if (who === 1 && p2Ref.current === 'cpu') continue;
         event.preventDefault();
@@ -504,9 +529,9 @@ export function Select({ races, classes, records, legends, portraits, fighters, 
         </div>
       </div>
       <footer class="controls">
-        <span><b>P1</b> WASD move · J choose · H back{legendsOnly ? '' : ' · U ♂/♀ · K/L class'}</span>
-        <span><b>P2</b> arrows · , or Num1 choose · M back{legendsOnly ? '' : ' · Right Shift ♂/♀ · . / class'}</span>
-        <span><b>Tab</b> player 2: {p2} · <b>Esc</b> back</span>
+        <span><b>P1</b> {ROSTER_HINTS[layout][0][0]}{legendsOnly ? '' : ROSTER_HINTS[layout][0][1]}</span>
+        <span><b>P2</b> {ROSTER_HINTS[layout][1][0]}{legendsOnly ? '' : ROSTER_HINTS[layout][1][1]}</span>
+        <span><b>Tab</b> player 2: {p2} · <b>C</b> keys: {LAYOUT_WORDS[layout]} · <b>Esc</b> back</span>
       </footer>
       {guide && <Guide page={guide} onPage={setGuide} onClose={() => setGuide(undefined)} />}
     </div>
