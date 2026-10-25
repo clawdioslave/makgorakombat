@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { BRAND } from '../../engine/brand';
+import { RULES } from '../../engine/rules';
 import type { Ability } from '../../engine/abilities';
 import type { Match } from '../../engine/engine';
 import type { MoveTable, Weapon } from '../../engine/moves';
@@ -42,6 +43,8 @@ interface Frame {
   cinematic: boolean;
   /** Each side's ability ids in slot order, for the sequence's icons. */
   kits: [string[], string[]];
+  /** The rules the fight is fought under. */
+  rules: Match['rules'];
 }
 
 /** Status effects whose icons are wanted before they appear. */
@@ -112,6 +115,7 @@ export function FightUi({ fighters, p2, assets }: FightUiProps) {
         sequence: sequenceOf(match, p2),
         cinematic: match.fatality !== undefined && (match.phase === 'fatality' || match.phase === 'ko'),
         kits: [match.tables[0].kit.abilities.map((a) => a.id), match.tables[1].kit.abilities.map((a) => a.id)],
+        rules: match.rules,
       });
       if (!loaded.current) {
         loaded.current = true;
@@ -199,7 +203,7 @@ export function FightUi({ fighters, p2, assets }: FightUiProps) {
               <div class="hint">
                 {human[i] ? (
                   <>
-                    <b>{keyLabel(i, 'left')}</b> <b>{keyLabel(i, 'right')}</b> move · <b>{keyLabel(i, 'jump')}</b> jump · <b>{keyLabel(i, 'attack')}</b> attack · hover or hold a key for what it does
+                    {RULES[frame.rules].word} rules · <b>{keyLabel(i, 'left')}</b> <b>{keyLabel(i, 'right')}</b> move{frame.rules === 'kombat' ? ', back blocks, twice dashes' : ''} · <b>{keyLabel(i, 'jump')}</b> jump · <b>{keyLabel(i, 'attack')}</b> attack · hover or hold a key for what it does
                   </>
                 ) : (
                   'COMPUTER'

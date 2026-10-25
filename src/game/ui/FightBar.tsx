@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { type Ability, GCD_FRAMES } from '../../engine/abilities';
+import type { Ability } from '../../engine/abilities';
 import { type InputAction, KEYS, keyLabel } from '../../engine/input';
 import type { Weapon } from '../../engine/moves';
 import type { AbilityView, FighterView } from '../../engine/view';
@@ -110,7 +110,7 @@ interface SlotProps {
 function AbilitySlot({ side, ability, spec, resource, icon, flash, open, onHover }: SlotProps) {
   const cooling = ability.cooldown.remaining > 0 && ability.cooldown.total > 0;
   const onGcd = !cooling && ability.gcd > 0;
-  const sweep = cooling ? ability.cooldown.remaining / ability.cooldown.total : onGcd ? ability.gcd / GCD_FRAMES : 0;
+  const sweep = cooling ? ability.cooldown.remaining / ability.cooldown.total : onGcd ? ability.gcd / ability.gcdTotal : 0;
   const why = ability.blocked;
   const short = why !== undefined && why.startsWith('NOT ENOUGH');
   const far = why === 'OUT OF RANGE' || why === 'TOO CLOSE';
