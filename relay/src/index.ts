@@ -1,15 +1,20 @@
 import { DurableObject } from 'cloudflare:workers';
+import { LOBBY, type Lobby } from './lobby';
+
+export { Lobby } from './lobby';
 
 /*
  * The relay for MAK'GORA KOMBAT's online play. A room is a six-letter code and one Durable
  * Object; it holds at most a host and a guest, hands every message one of them sends to the
  * other as it came, and tells each when the other comes or goes. It never reads, keeps or
  * judges what the players send: the fight runs on both machines in lockstep, and the relay is
- * only the wire between them. A room nobody has been in for ten minutes is forgotten.
+ * only the wire between them. A room nobody has been in for ten minutes is forgotten. The lobby
+ * (lobby.ts) is where two players find each other and are handed a room.
  */
 
 export interface Env {
   ROOMS: DurableObjectNamespace<Room>;
+  LOBBY: DurableObjectNamespace<Lobby>;
 }
 
 export type Role = 'host' | 'guest';
@@ -26,7 +31,7 @@ const other = (role: Role): Role => (role === 'host' ? 'guest' : 'host');
 /** Pages allowed to use the relay: the game's own, and any served from this machine while it is worked on. */
 export function allowedOrigin(origin: string | null): boolean {
   if (origin === null) return true;
-  if (origin === 'https://realworldbuilder.github.io') return true;
+  if (origin === 'https://realworldbuilder.github.io' || origin === 'https://makgora.clawdioslave.com') return true;
   return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
 
@@ -48,6 +53,15 @@ export function newCode(): string {
 
 export function isCode(code: string): boolean {
   return code.length === CODE_LENGTH && [...code].every((c) => ALPHABET.includes(c));
+}
+
+/** Makes a room under a fresh code and answers it; undefined when no free code turned up. */
+export async function openRoom(env: Env): Promise<string | undefined> {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const code = newCode();
+    if (await env.ROOMS.getByName(code).open()) return code;
+  }
+  return undefined;
 }
 
 const peer = (joined: boolean) => JSON.stringify({ t: 'peer', joined });
@@ -138,10 +152,8 @@ export default {
     if (!allowedOrigin(origin)) return new Response('This page may not use the relay.', { status: 403 });
 
     if (url.pathname === '/rooms' && request.method === 'POST') {
-      for (let attempt = 0; attempt < 8; attempt++) {
-        const code = newCode();
-        if (await env.ROOMS.getByName(code).open()) return Response.json({ code }, { headers: cors });
-      }
+      const code = await openRoom(env);
+      if (code) return Response.json({ code }, { headers: cors });
       return new Response('No free room code; try again.', { status: 503, headers: cors });
     }
 
@@ -152,7 +164,9 @@ export default {
       return env.ROOMS.getByName(code).fetch(request);
     }
 
-    if (url.pathname === '/') return new Response('makgora-relay: POST /rooms, then GET /rooms/:code/ws?role=host|guest', { headers: cors });
+    if (url.pathname === '/lobby/ws' && request.method === 'GET') return env.LOBBY.getByName(LOBBY).fetch(request);
+
+    if (url.pathname === '/') return new Response('makgora-relay: GET /lobby/ws?name=&id=; or POST /rooms, then GET /rooms/:code/ws?role=host|guest', { headers: cors });
     return new Response('Not found', { status: 404, headers: cors });
   },
 } satisfies ExportedHandler<Env>;

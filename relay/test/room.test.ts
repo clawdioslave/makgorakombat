@@ -1,45 +1,7 @@
 import { env, runDurableObjectAlarm, runInDurableObject, SELF } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { ALPHABET, allowedOrigin, isCode, type Room } from '../src/index';
-
-/** A player at the far end of a socket: what it was sent, in order, and a way to wait for the next. */
-class Client {
-  readonly got: (string | ArrayBuffer)[] = [];
-  closed = false;
-  private waiting: (() => void)[] = [];
-
-  constructor(readonly ws: WebSocket) {
-    ws.accept();
-    ws.addEventListener('message', (event) => {
-      // Bytes arrive as a Blob here, as in a browser that has not asked for ArrayBuffers.
-      const data = event.data as string | ArrayBuffer | Blob;
-      const arrived = data instanceof Blob ? data.arrayBuffer() : Promise.resolve(data);
-      void arrived.then((message) => {
-        this.got.push(message);
-        this.waiting.splice(0).forEach((wake) => wake());
-      });
-    });
-    ws.addEventListener('close', () => {
-      this.closed = true;
-    });
-  }
-
-  /** Waits until `n` messages in all have come. */
-  async until(n: number): Promise<void> {
-    const deadline = Date.now() + 2000;
-    while (this.got.length < n) {
-      if (Date.now() > deadline) throw new Error(`waited for ${n} messages, got ${this.got.length}`);
-      await new Promise<void>((resolve) => {
-        this.waiting.push(resolve);
-        setTimeout(resolve, 50);
-      });
-    }
-  }
-
-  json(k: number): unknown {
-    return JSON.parse(this.got[k] as string);
-  }
-}
+import { Client } from './client';
 
 async function makeRoom(origin?: string): Promise<{ code: string; response: Response }> {
   const response = await SELF.fetch('https://relay.test/rooms', { method: 'POST', headers: origin ? { Origin: origin } : {} });
@@ -145,6 +107,7 @@ describe('relay', () => {
 
   it('lets the game pages in and keeps other sites out', async () => {
     expect(allowedOrigin('https://realworldbuilder.github.io')).toBe(true);
+    expect(allowedOrigin('https://makgora.clawdioslave.com')).toBe(true);
     expect(allowedOrigin('http://localhost:5183')).toBe(true);
     expect(allowedOrigin('http://localhost')).toBe(true);
     expect(allowedOrigin('https://evil.example')).toBe(false);
