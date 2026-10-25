@@ -1,8 +1,9 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { BRAND } from '../engine/brand';
 import { ActionBar, GLYPHS } from './ActionBar';
 import type { Phase } from './folder';
 import { Guide, type GuidePage } from './Guide';
+import { Settings } from './Settings';
 
 interface TitleProps {
   phase: Phase;
@@ -35,7 +36,29 @@ export function LogoArt({ small }: { small?: boolean }) {
 
 export function Title({ phase, dragging, onPick }: TitleProps) {
   const [guide, setGuide] = useState<GuidePage>();
+  const [settings, setSettings] = useState(false);
+  const picker = useRef<HTMLInputElement>(null);
   const opening = phase.kind === 'opening';
+
+  // The action bar's hotkeys: 1 opens the folder picker (a key press counts as the click the
+  // browser wants), 2 and 3 the guide, 4 the source, 5 the settings.
+  useEffect(() => {
+    if (opening) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (guide || settings || event.metaKey || event.ctrlKey || event.altKey) return;
+      switch (event.code) {
+        case 'Digit1': case 'Numpad1': picker.current?.click(); break;
+        case 'Digit2': case 'Numpad2': setGuide('play'); break;
+        case 'Digit3': case 'Numpad3': setGuide('champion'); break;
+        case 'Digit4': case 'Numpad4': window.open(SOURCE, '_blank', 'noreferrer'); break;
+        case 'Digit5': case 'Numpad5': setSettings(true); break;
+        default: return;
+      }
+      event.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [opening, guide, settings]);
   return (
     <div class={`screen title ${dragging ? 'over' : ''}`}>
       <div class="faceoff" aria-hidden="true">
@@ -71,6 +94,7 @@ export function Title({ phase, dragging, onPick }: TitleProps) {
                 ],
                 input: (
                   <input
+                    ref={picker}
                     type="file"
                     // @ts-expect-error webkitdirectory is not in the DOM typings
                     webkitdirectory
@@ -110,6 +134,16 @@ export function Title({ phase, dragging, onPick }: TitleProps) {
                   { left: 'Use: Read how the game is made, on GitHub.', hue: 'green' },
                 ],
               },
+              {
+                key: '5',
+                label: 'SETTINGS',
+                icon: GLYPHS.gear,
+                onClick: () => setSettings(true),
+                tip: [
+                  { left: 'Settings', kind: 'name', hue: 'common' },
+                  { left: 'Use: The sound, the music and which keys the two players hold. Remembered in this browser.', hue: 'green' },
+                ],
+              },
             ]}
           />
           <p class="hint">
@@ -125,6 +159,7 @@ export function Title({ phase, dragging, onPick }: TitleProps) {
         <a href="https://realworldbuilder.github.io/mogshot/">Mogshot</a> engine.
       </p>
       {guide && <Guide page={guide} onPage={setGuide} onClose={() => setGuide(undefined)} />}
+      {settings && <Settings onClose={() => setSettings(false)} />}
     </div>
   );
 }
